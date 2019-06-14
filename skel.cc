@@ -1,3 +1,6 @@
+#include <iostream>
+#include <map>
+
 /*
  * ======================================================================
  *
@@ -16,11 +19,16 @@
  * Tcl Skeletons
  * ----------------------------------------------------------------------
  */
-
 #include "combat.h"
+#include <unistd.h>
 #include <assert.h>
+#include <string>
+#include <pthread.h>
+#include <time.h>
 
-char * combat_skel_id = "$Id: skel.cc,v 1.30 2003/04/20 16:09:35 fp Exp $";
+char * combat_skel_id = "$Id$";
+Tcl_ThreadId mainThreadId;
+bool debug=false;
 
 /*
  * ----------------------------------------------------------------------
@@ -81,6 +89,11 @@ Combat::Servant::Servant (Tcl_Interp * _i,
   assert (obj);
   assert (ctx);
   Tcl_IncrRefCount (obj);
+  mainThreadId = Tcl_GetCurrentThread();
+  if(debug)
+  {
+	  std::cout << "calling new Servant() thread id = "  << mainThreadId << "\n";
+  }
 }
 
 Combat::Servant::~Servant ()
@@ -113,6 +126,7 @@ Combat::DynamicServant::~DynamicServant ()
 CORBA::Object_ptr
 Combat::DynamicServant::_this ()
 {
+  if(debug) std::cout << "calling _this, thread id = "  << Tcl_GetCurrentThread() << "\n";
   return PortableServer::DynamicImplementation::_this ();
 }
 
@@ -317,6 +331,9 @@ Combat::DynamicServant::dispatch_invoke (const char * op,
   }
 }
 
+
+
+
 void
 Combat::DynamicServant::dispatch_attr_get (const char * attr,
 					   CORBA::ServerRequest_ptr svr,
@@ -448,46 +465,6 @@ Combat::DynamicServant::dispatch_attr_set (const char * attr,
   Tcl_DecrRefCount (com);
 }
 
-void
-Combat::DynamicServant::invoke (CORBA::ServerRequest_ptr svr)
-{
-  /*
-   * Operation or Attribute
-   */
-
-  const char * op = svr->operation ();
-  bool isset;
-
-  if (strncmp (op, "_set_", 5) == 0) {
-    isset = true;
-    op += 5;
-  }
-  else if (strncmp (op, "_get_", 5) == 0) {
-    isset = false;
-    op += 5;
-  }
-
-  CORBA::OperationDescription * od;
-  CORBA::AttributeDescription * ad;
-
-  if (iface->lookup (op, od, ad)) {
-    assert (od != NULL || ad != NULL);
-    if (od != NULL) {
-      dispatch_invoke (op, svr, od);
-    }
-    else if (ad != NULL && isset) {
-      dispatch_attr_set (op, svr, ad);
-    }
-    else {
-      dispatch_attr_get (op, svr, ad);
-    }
-    return;
-  }
-
-  CORBA::Any ex;
-  ex <<= CORBA::BAD_OPERATION (0, CORBA::COMPLETED_NO);
-  svr->set_exception (ex);
-}
 
 CORBA::RepositoryId
 Combat::DynamicServant::_primary_interface (const PortableServer::ObjectId &,
@@ -1077,3 +1054,191 @@ Combat::AdapterActivator::unknown_adapter (PortableServer::POA_ptr parent,
   return bval ? TRUE : FALSE;
 }
 
+
+void
+Combat::DynamicServant::invoke_delegate (CORBA::ServerRequest_ptr svr)
+{
+  /*
+   * Operation or Attribute
+   */
+
+	if(debug)
+	{
+		std::cerr << "inside of invoke_delegate, thread id = "  << Tcl_GetCurrentThread() << std::endl;
+	}
+
+
+  const char * op = svr->operation ();
+  bool isset;
+
+  if(debug)
+  {
+	  std::cerr << "got operation , thread id = "  << Tcl_GetCurrentThread() << " operation = " << op << std::endl;
+  }
+
+  if (strncmp (op, "_set_", 5) == 0) {
+    isset = true;
+    op += 5;
+  }
+  else if (strncmp (op, "_get_", 5) == 0) {
+    isset = false;
+    op += 5;
+  }
+
+  CORBA::OperationDescription * od;
+  CORBA::AttributeDescription * ad;
+
+  if (iface->lookup (op, od, ad)) {
+    assert (od != NULL || ad != NULL);
+    if (od != NULL) {
+      if(debug)
+      {
+      	std::cerr << "invoking operation = " << op << std::endl;
+      }
+      dispatch_invoke (op, svr, od);
+    }
+    else if (ad != NULL && isset) {
+      dispatch_attr_set (op, svr, ad);
+    }
+    else {
+      dispatch_attr_get (op, svr, ad);
+    }
+    if(debug)
+    {
+    	std::cerr << "finished operation , thread id = "  << Tcl_GetCurrentThread() << " operation = " << op << std::endl;
+    }
+    return;
+  }
+
+  CORBA::Any ex;
+  ex <<= CORBA::BAD_OPERATION (0, CORBA::COMPLETED_NO);
+  svr->set_exception (ex);
+}
+
+//static void log (std::string msg) {
+//	if (MICO::Logger::IsLogged (MICO::Logger::Warning)) {
+//		MICO::Logger::Stream (MICO::Logger::Warning) <<  msg << endl;
+//	}
+//}
+
+
+typedef struct
+{
+	Tcl_EventProc *proc;
+	struct Tcl_Event *nextPtr;
+//	Tcl_ThreadId callingThreadId;
+//	Tcl_Mutex *mutex;
+//	Tcl_Condition *condition;
+	pthread_mutex_t *mutex;
+	pthread_cond_t *condition;
+	Combat::DynamicServant* servant;
+    CORBA::ServerRequest_ptr * request;
+    bool processed;
+}  CombatEvent, *CombatEventPointer;
+
+static int processEvent (Tcl_Event *eventPtr, int flags)
+{
+	if(debug) {
+		std::cout << "processEvent: tid = "  << Tcl_GetCurrentThread() << " flags = " << flags << std::endl;
+	}
+	CombatEventPointer event = (CombatEventPointer)eventPtr;
+	event->servant->invoke_delegate(*(event->request));
+//	Tcl_MutexLock(event->mutex);
+//	Tcl_ConditionNotify(event->condition);
+//	Tcl_MutexUnlock(event->mutex);
+//	Tcl_MutexFinalize(event->mutex);
+//	usleep(1000*1000);
+//	std::cout << "slept 1000 ms\n";
+	if(debug) {
+		std::cout << "processEvent: locking mutex"   << std::endl;
+	}
+	int lock_status = pthread_mutex_lock(event->mutex);
+	if(debug) {
+		std::cout << "processEvent: lock_status = "  << lock_status << std::endl;
+		std::cout << "processEvent: notifying all " << std::endl;
+	}
+	event->processed=true;
+	int signal_status = pthread_cond_broadcast(event->condition);
+	if(debug) {
+		std::cout << "processEvent: finished broadcasting, signal_status = "  << signal_status << std::endl;
+	}
+	int unlock_status = pthread_mutex_unlock(event->mutex);
+	int status = 1;
+	return status;
+}
+
+void
+Combat::DynamicServant::invoke (CORBA::ServerRequest_ptr svr)
+{
+	Tcl_ThreadId tid = Tcl_GetCurrentThread();
+	Tcl_ThreadId mainThread = getMainThread();
+
+	if (debug)
+	{
+		std::cout << "calling invoke: thread id = " << tid << " operation = " << svr->operation()
+				<< ", main thread id = " <<  mainThread << std::endl;
+	}
+
+	if (mainThread == tid) {
+		if (debug)
+		{
+			std::cout << "invoke called from main thread so calling directly" << std::endl;
+		}
+		invoke_delegate(svr);
+		return;
+	}
+
+	CombatEventPointer event = (CombatEventPointer) Tcl_Alloc(sizeof(CombatEvent));
+
+//	Tcl_Mutex *mutex = new Tcl_Mutex;
+//	Tcl_Mutex mutex;
+//	Tcl_Condition condition;
+//	Tcl_Time time={60,0};
+
+//	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	pthread_mutex_t mutex;
+	int mutex_status = pthread_mutex_init(&mutex,NULL);
+	if (mutex_status != 0) {
+		std::cerr << "error creating mutex " << mutex_status << std::endl;
+	}
+
+	timespec timeout;
+	timeout.tv_sec = time(NULL) + 10*60;
+	timeout.tv_nsec = 0;
+//	pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
+	pthread_cond_t condition;
+	pthread_condattr_t condition_attributes;
+//	int condition_attribute_status = pthread_condattr_init(&condition_attributes);
+	int condition_status = pthread_cond_init(&condition,NULL);
+	if (condition_status != 0) {
+		std::cerr << "error creating condition status" << condition_status << std::endl;
+	}
+
+
+	event->proc = processEvent;
+//	event->callingThreadId = tid;
+	event->mutex = &mutex;
+	event->condition = &condition;
+	event->request = &svr;
+	event->servant = this;
+
+	if(debug) std::cout << "Locking mutex\n";
+//	Tcl_MutexLock(&mutex);
+	if(debug) std::cout << "Queueing event\n";
+	pthread_mutex_lock(&mutex);
+	Tcl_ThreadQueueEvent(mainThread,(Tcl_Event *)event,TCL_QUEUE_TAIL);
+	Tcl_ThreadAlert(mainThread);
+	if(debug) std::cout << "Waiting to be notified by the queue\n";
+	int err = pthread_cond_timedwait(&condition,&mutex,&timeout);
+	if (err != 0) {
+		std::cerr << "timed out waiting for alert";
+	} else {
+		if(debug) std::cerr << "Notified by the queue" << std::endl;
+	}
+	pthread_mutex_unlock(&mutex);
+//	Tcl_ConditionWait(&condition,&mutex,&time);
+//	Tcl_MutexUnlock(&mutex);
+	int mutex_destroy_condition = pthread_cond_destroy(&condition);
+	int mutex_destroy_status = pthread_mutex_destroy(&mutex);
+
+}

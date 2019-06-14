@@ -11,7 +11,7 @@
 #include "mico-binder.h"
 #include <assert.h>
 
-char * combat_mico_binder_id = "$Id: mico-binder.cc,v 1.4 2000/02/20 19:04:15 fp Exp $";
+char * combat_mico_binder_id = "$Id$";
 
 MicoBinder::BindRequest::BindRequest ()
 {

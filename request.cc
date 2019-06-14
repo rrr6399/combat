@@ -11,7 +11,7 @@
 #include <string>
 #include <assert.h>
 
-char * combat_request_id = "$Id: request.cc,v 1.28 2003/06/27 01:55:16 fp Exp $";
+char * combat_request_id = "$Id$";
 
 /*
  * ----------------------------------------------------------------------

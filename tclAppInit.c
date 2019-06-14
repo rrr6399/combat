@@ -24,9 +24,10 @@ extern "C" {
  * Sun shared libraries to be used for Tcl.
  */
 
+/*
 extern int matherr _ANSI_ARGS_((void));
 static int (*dummyMathPtr) _ANSI_ARGS_((void)) = matherr;
-
+*/
 /*
  *----------------------------------------------------------------------
  *
@@ -51,6 +52,9 @@ int Combat_Init (Tcl_Interp *);
 int
 Tcl_AppInit(Tcl_Interp *interp)
 {
+
+printf("tcl init thread id = %s\n",Tcl_GetCurrentThread());
+
     if (Tcl_Init(interp) == TCL_ERROR) {
 	return TCL_ERROR;
     }

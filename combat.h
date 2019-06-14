@@ -12,6 +12,10 @@
 #ifndef __COMBAT_H__
 #define __COMBAT_H__
 
+#ifndef TCL_THREADS
+#define TCL_THREADS
+#endif
+
 /*
  * ORB-specific includes and defines
  */
@@ -442,6 +446,7 @@ public:
   CORBA::Object_ptr _this ();
 
   void invoke (CORBA::ServerRequest_ptr);
+  void invoke_delegate (CORBA::ServerRequest_ptr);
   CORBA::RepositoryId _primary_interface (const PortableServer::ObjectId &,
 					  PortableServer::POA_ptr);
 
@@ -707,6 +712,8 @@ int Combat_Invoke (ClientData, Tcl_Interp *, int, Tcl_Obj *CONST []);
 // from any.cc
 
 int Combat_ListFromAny (Tcl_Interp *, Tcl_Obj *);
+
+Tcl_ThreadId getMainThread();
 
 };
 

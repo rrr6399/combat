@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: idl2tcl.in,v 1.21 2004/12/14 01:40:04 fp Exp $ \
+# $Id$ \
 # \
 exec combatsh "$0" ${1+"$@"}
 
@@ -746,10 +746,6 @@ namespace eval CodeGen {
 		$visi]
     }
 
-    proc emitNative {obj} {
-	return [list native [emitRepoId $obj]]
-    }
-
     proc emit {contained} {
 	variable container
 	variable visited
@@ -777,7 +773,7 @@ namespace eval CodeGen {
 	    dk_ValueBox          { set res [emitValueBox $contained] }
 	    dk_ValueMember       { set res [emitValueMember $contained] }
 	    dk_Module            { set res {} }
-	    dk_Native            { set res [emitNative $contained] }
+	    dk_Native            { set res {} }
 	    dk_Typedef -
 	    dk_Primitive -
 	    dk_String -

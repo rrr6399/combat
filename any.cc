@@ -19,7 +19,7 @@
 #include <assert.h>
 #include <errno.h>
 
-char * combat_any_id = "$Id: any.cc,v 1.36 2003/06/27 01:55:16 fp Exp $";
+char * combat_any_id = "$Id$";
 
 /*
  * Extractor and Packer classes

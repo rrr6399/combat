@@ -30,9 +30,10 @@
 
 #include "combat.h"
 #include <assert.h>
+#include <pthread.h>
 #include <mico/template_impl.h>
 
-char * combat_event_mico_id = "$Id: event-mico.cc,v 1.5 2003/06/27 01:55:16 fp Exp $";
+char * combat_event_mico_id = "$Id$";
 
 
 #if TCL_MAJOR_VERSION > 7
@@ -78,6 +79,8 @@ class TclDispatcher : public CORBA::Dispatcher {
 
     Combat::Context * ctx;
 
+    pthread_t mainThreadId;
+
     int tcl_mask (CORBA::Long handle, FileEvent * &next_event);
     int tcl_mask (CORBA::Long handle);
 
@@ -101,7 +104,7 @@ TclDispatcher::input_callback (ClientData _event, int mask)
 {
     /*
      * Tcl allows only one handler to be installed for each file
-     * handle. so we have to extract the file handle from the passend
+     * handle. so we have to extract the file handle from the past in
      * event, traverse the list of file events and call each handler
      * that matches the file handle and 'mask'. we have to be
      * careful, because event handlers can remove and add new events,
@@ -143,7 +146,7 @@ TclDispatcher::input_callback (ClientData _event, int mask)
      * If any asynchronous DII requests have finished, try all callbacks.
      */
     
-    if (Combat::GlobalData->orb->poll_next_response()) {
+    if (Combat::GlobalData->orb->poll_next_response()) { // bug?
       /*
        * Call PollResult on AsyncOps so that the finished request is
        * removed from the ORBs queue and won't cause continous events
@@ -194,6 +197,7 @@ TclDispatcher::timer_callback (ClientData _event)
 TclDispatcher::TclDispatcher (Combat::Context * _ctx)
 {
   ctx = _ctx;
+  mainThreadId = pthread_self();
 }
 
 TclDispatcher::~TclDispatcher ()
@@ -321,9 +325,12 @@ TclDispatcher::remove (CORBA::DispatcherCallback *cb, Event e)
 void
 TclDispatcher::run (CORBA::Boolean infinite)
 {
-  do {
-      Tcl_DoOneEvent (0);
-  } while (infinite);
+	pthread_t currentThreadId = pthread_self();
+	if (pthread_equal(mainThreadId, currentThreadId) > 0) {
+		do {
+			Tcl_DoOneEvent(0);
+		} while (infinite);
+	}
 }
 
 void

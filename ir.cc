@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-char * combat_ir_id = "$Id: ir.cc,v 1.28 2004/12/14 01:40:04 fp Exp $";
+char * combat_ir_id = "$Id$";
 
 /*
  * Helper Classes
@@ -49,7 +49,6 @@ private:
   int addValue     (Tcl_Obj *, CORBA::Container_ptr);
   int addValueBox  (Tcl_Obj *, CORBA::Container_ptr);
   int addValueMember(Tcl_Obj *, CORBA::Container_ptr);
-  int addNative    (Tcl_Obj *, CORBA::Container_ptr);
 
   int scanRepoid (Tcl_Obj *, char *&, char *&, char *&);
   CORBA::IDLType_ptr scanIDLTypeName (Tcl_Obj *);
@@ -397,14 +396,6 @@ CodeScanTcl::addContained (Tcl_Obj * data, CORBA::Container_ptr c)
   const char * str;
   int res;
 
-  if (Tcl_ListObjLength (NULL, data, &res) != TCL_OK) {
-    return TCL_ERROR;
-  }
-
-  if (res == 0) {
-    return TCL_OK;
-  }
-
   if (Tcl_ListObjIndex (NULL, data, 0, &item) != TCL_OK) {
     Tcl_AppendResult (interp, "error: expected contained data, but got \"",
 		      Tcl_GetStringFromObj (data, NULL), "\"", NULL);
@@ -453,9 +444,6 @@ CodeScanTcl::addContained (Tcl_Obj * data, CORBA::Container_ptr c)
   }
   else if (strcmp (str, "valuemember") == 0) {
     res = addValueMember (data, c);
-  }
-  else if (strcmp (str, "native") == 0) {
-    res = addNative (data, c);
   }
   else {
     Tcl_AppendResult (interp, "error: unknown contained item \"",
@@ -1983,53 +1971,3 @@ CodeScanTcl::addValueMember (Tcl_Obj * data, CORBA::Container_ptr c)
   return TCL_OK;
 }
 
-
-int
-CodeScanTcl::addNative (Tcl_Obj * data, CORBA::Container_ptr c)
-{
-  char *id, *name, *version;
-  Tcl_Obj *o1, *o2;
-  const char *str;
-  int len;
-
-  if (Tcl_ListObjLength (NULL, data, &len) != TCL_OK || len != 2 ||
-      Tcl_ListObjIndex (NULL, data, 0, &o1) != TCL_OK ||
-      Tcl_ListObjIndex (NULL, data, 1, &o2) != TCL_OK ||
-      (str = Tcl_GetStringFromObj (o1, NULL)) == NULL ||
-      strcmp (str, "native") != 0) {
-    Tcl_AppendResult (interp, "error: not a native: \"",
-		      Tcl_GetStringFromObj (data, NULL),
-		      "\" (does not look like native data)", NULL);
-    return TCL_ERROR;
-  }
-
-  if (scanRepoid (o2, id, name, version) != TCL_OK) {
-    Tcl_AppendResult (interp, "\n  while scanning native from \"",
-		      Tcl_GetStringFromObj (data, NULL),
-		      "\"", NULL);
-    return TCL_ERROR;
-  }
-
-  CORBA::NativeDef_var nd;
-  CORBA::Contained_var cv = lookup_local (name, c);
-
-  if (CORBA::is_nil (cv)) {
-    nd = c->create_native (id, name, version);
-    assert (!CORBA::is_nil (nd));
-  }
-  else {
-    nd = CORBA::NativeDef::_narrow (cv);
-    if (CORBA::is_nil (nd)) {
-      CORBA::String_var frame = absolute_name (c);
-      Tcl_AppendResult (interp, "error: while adding module \"",
-			name, "\" to \"", (char *) frame,
-			"\": identifier exists, but is not a native",
-			NULL);
-      return TCL_ERROR;
-    }
-    nd->id (id);
-    nd->version (version);
-  }
-
-  return TCL_OK;
-}

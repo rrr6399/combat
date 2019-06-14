@@ -6,6 +6,10 @@
 #
 # Try to find a suitable tclsh8.x
 # \
+tcl="`which tclsh8.5`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
+tcl="`which tclsh8.4`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
 tcl="`which tclsh8.3`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
 # \
 tcl="`which tclsh8.2`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi

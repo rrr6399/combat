@@ -18,7 +18,7 @@
 #include "combat.h"
 #include <assert.h>
 
-char * combat_event_corba_id = "$Id: event-corba.cc,v 1.5 2001/05/14 13:07:47 fp Exp $";
+char * combat_event_corba_id = "$Id$";
 
 /*
  * Poll Delay - sleep this time between ORB polls (in microseconds)

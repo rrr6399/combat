@@ -1,7 +1,8 @@
+#include <iostream>
 /*
  * ======================================================================
  *
- * This file is part of Combat, the Tcl interface for MICO
+  << "\n";* This file is part of Combat, the Tcl interface for MICO
  * Copyright (c) Frank Pilhofer
  *
  * ======================================================================
@@ -12,6 +13,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string>
+#include <iostream>
+#include <ostream>
+#include <stdio.h>
 
 #ifdef COMBAT_USE_MICO
 #include "mico-binder.h"
@@ -21,7 +25,8 @@
 #include <mico/ir_creator.h>
 #endif
 
-char * combat_combat_id = "$Id: combat.cc,v 1.21 2004/07/21 02:39:33 fp Exp $";
+char * combat_combat_id = "$Id$";
+Tcl_ThreadId mainThread;
 
 /*
  * ----------------------------------------------------------------------
@@ -382,8 +387,11 @@ Combat::InterfaceCache::insert (CORBA::InterfaceDef_ptr ifd,
 void
 Combat::InterfaceCache::remove (const char * repoid)
 {
+//printf("repoid = %s\n",repoid);
   IfaceMap::iterator ii = interfaces.find (repoid);
-  assert (ii != interfaces.end());
+//std::cerr << "repoid = " << repoid << std::endl;
+//std::cerr << "ii = " << ii << std::endl;
+  assert (ii != interfaces.end()); // rrr: bug here?
   if (--(*ii).second.refs == 0) {
     delete (*ii).second.desc;
     interfaces.erase (ii);
@@ -2944,7 +2952,9 @@ static void
 Combat_Handle_DupInternal (Tcl_Obj * src, Tcl_Obj * dup)
 {
   if (src->internalRep.twoPtrValue.ptr2) {
-    assert (0);
+    //rrr assert (0);
+		//std::cerr << "handle being duplicated = " << src->typePtr->name << std::endl;
+		fprintf(stderr,"handle being duplicated, name = %s\n",src->typePtr->name);
   }
   Combat::OldCmdType.dupIntRepProc (src, dup);
 }
@@ -2997,6 +3007,9 @@ Combat_Init (Tcl_Interp *interp)
 #endif
 
   ctx = new Combat::Context;
+
+//printf("Combat_Init in combat.cc in thread id = %s\n ",Tcl_GetCurrentThread());
+//std::cout << "Combat_Init in combat.cc in thread id = "  << Tcl_GetCurrentThread() << "\n";
 
   /*
    * Interpreter-specific: add commands
@@ -3129,6 +3142,7 @@ Combat_Init (Tcl_Interp *interp)
   /*
    * Install WhenDeleted handler
    */
+  mainThread = Tcl_GetCurrentThread();
 
   Tcl_CallWhenDeleted (interp, Combat_DeleteLocal, (ClientData) 0);
 
@@ -3139,6 +3153,11 @@ Combat_Init (Tcl_Interp *interp)
   Tcl_PkgProvide (interp, "combat", "0.7");
 
   return TCL_OK;
+}
+
+Tcl_ThreadId getMainThread()
+{
+	return mainThread;
 }
 
 /*

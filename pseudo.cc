@@ -18,7 +18,7 @@
 #include "combat.h"
 #include <assert.h>
 
-char * combat_pseudo_id = "$Id: pseudo.cc,v 1.27 2003/04/20 16:09:35 fp Exp $";
+char * combat_pseudo_id = "$Id$";
 
 /*
  * ----------------------------------------------------------------------
@@ -736,6 +736,9 @@ Combat::POA::create_POA (Tcl_Interp * interp, Context * ctx,
     }
     else if (strcmp (pname, "SINGLE_THREAD_MODEL") == 0) {
       policies[i] = managed->create_thread_policy (PortableServer::SINGLE_THREAD_MODEL);
+    }
+    else if (strcmp (pname, "MAIN_THREAD_MODEL") == 0) {
+      policies[i] = managed->create_thread_policy (PortableServer::MAIN_THREAD_MODEL);
     }
     else if (strcmp (pname, "TRANSIENT") == 0) {
       policies[i] = managed->create_lifespan_policy (PortableServer::TRANSIENT);

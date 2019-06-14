@@ -19,7 +19,7 @@
 #include <string>
 #include <assert.h>
 
-char * combat_typecode_id = "$Id: typecode.cc,v 1.29 2003/06/27 01:55:16 fp Exp $";
+char * combat_typecode_id = "$Id$";
 
 /*
  * TypeCode constructing / deconstructing classes
