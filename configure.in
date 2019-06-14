@@ -1,0 +1,896 @@
+dnl     This file is an input file used by the GNU "autoconf" program to
+dnl     generate the file "configure", which tries to guess your system
+dnl     configuration
+dnl
+dnl $Id: configure.in,v 1.30 2002/02/18 18:06:58 fp Exp $
+dnl
+
+AC_INIT(combat.h)
+AC_PREREQ(2.9)
+
+AC_ARG_WITH(tcl,              [  --with-tcl=dir                  Find tcl installation below dir])
+AC_ARG_WITH(mico,             [  --with-mico=dir                 Find MICO installation below dir])
+AC_ARG_ENABLE(mico-dispatcher,[    --disable-mico-dispatcher     Disable MICO-specific event dispatcher])
+AC_ARG_WITH(orbacus,          [  --with-orbacus=dir              Find ORBacus installation below dir])
+AC_ARG_ENABLE(orbacus-repo,   [    --disable-orbacus-repo        Don't fork a local Interface Repository])
+AC_ARG_WITH(orbix,            [  --with-orbix=dir                Find Orbix 2000 Beta below dir])
+AC_ARG_WITH(generic-orb,      [  --with-generic-orb              Use other CORBA 2.3 ORB])
+AC_ARG_WITH(generic-orb-lib,  [    --with-generic-orb-lib=libs   ORB libraries (-l...)])
+AC_ARG_ENABLE(shared,         [  --enable-shared                 Try to build as a loadable module])
+AC_ARG_ENABLE(debug,          [  --enable-debug                  Compile using -g])
+AC_ARG_ENABLE(optimize,       [  --disable-optimize              Don't compile using -O])
+AC_ARG_ENABLE(server-side,    [  --disable-server-side           Disable server-side scripting support])
+AC_ARG_ENABLE(combat-ir,      [  --disable-combat-ir             Disable combat::ir feature support])
+AC_ARG_WITH(includes,         [  --with-includes=dirs            Additional include dirs (separated by ':')])
+AC_ARG_WITH(libs,             [  --with-libs=dirs                Additional lib dirs (separated by ':')])
+
+#
+# proc to look for a file in a number of places
+#
+
+AC_DEFUN(FP_FIND_FILE, [
+    if test "x$4" = "x" ; then
+	ff_name=[`echo $1 | sed 's/[-.*/ ]/_/g'`]
+    else
+	ff_name="$4"
+    fi
+    eval $ff_name=
+    eval ${ff_name}_dir=
+    ff_file=
+    ff_file_dir=
+    for ff_dir in $2 ; do
+	if test -f $ff_dir/$1 ; then
+	    ff_file_dir=$ff_dir
+	    ff_file=$ff_dir/$1
+	    break
+	fi
+	for ff_subdir in $3 ; do
+	    if test -f $ff_dir/$ff_subdir/$1 ; then
+		ff_file_dir=$ff_dir/$ff_subdir
+		ff_file=$ff_dir/$ff_subdir/$1
+		break
+	    fi
+	done
+	if test "x$ff_file" != "x" ; then
+	    break
+	fi
+    done
+    eval ${ff_name}_dir="$ff_file_dir"
+    eval $ff_name="$ff_file"
+])
+
+#
+# Determine system name
+#
+
+AC_MSG_CHECKING([system name])
+system=`uname -s`-`uname -r`
+if test "`uname -s`" = "AIX" ; then
+	system=AIX-`uname -v`.`uname -r`
+fi
+AC_MSG_RESULT($system)
+
+#
+# Basic setup
+#
+
+AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_MAKE_SET
+AC_PROG_RANLIB
+AC_LANG_CPLUSPLUS
+AC_PROG_CXXCPP
+
+AC_MSG_CHECKING(compiler flags)
+[CFLAGS=`echo $CFLAGS | sed 's/-g//g' | sed 's/-O[0-9]*//g'`]
+[CXXFLAGS=`echo $CXXFLAGS | sed 's/-g//g' | sed 's/-O[0-9]*//g'`]
+if test "x$enable_debug" = "xyes" ; then
+        CFLAGS="$CFLAGS -g"
+        CXXFLAGS="$CXXFLAGS -g"
+elif test "x$enable_optimize" != "xno" ; then
+	CFLAGS="$CFLAGS -O"
+	CXXFLAGS="$CXXFLAGS -O"
+fi
+if test "x$CXXFLAGS" = "x" ; then
+        AC_MSG_RESULT(none)
+else
+        AC_MSG_RESULT($CXXFLAGS)
+fi
+
+#
+# source and final bin dir
+#
+
+case $srcdir in
+/*)
+  ABSSRCDIR=$srcdir
+  ;;
+*)
+  ABSSRCDIR=`pwd`/$srcdir
+  ;;
+esac
+AC_SUBST(ABSSRCDIR)
+
+myprefix=$prefix
+myexec=$exec_prefix
+test "x$myprefix" = xNONE && myprefix=$ac_default_prefix
+test "x$myexec" = xNONE && myexec=${myprefix}
+ABSEXECDIR=$myexec
+AC_SUBST(ABSEXECDIR)
+
+#
+# ----------------------------------------------------------------------
+# Prepare for setup
+# ----------------------------------------------------------------------
+#
+
+orb_to_use=
+more_incs="`echo $with_includes | sed 's/:/ /g'`"
+more_libs="`echo $with_libs     | sed 's/:/ /g'`"
+base_incs="`echo $CPLUS_INCLUDE_PATH | sed 's/:/ /g'` /local/include /usr/local/include /usr/include"
+base_libs="`echo $LIBPATH $LIBRARY_PATH $LD_LIBRARY_PATH $SHLIB_PATH | sed 's/:/ /g'` /local/lib /usr/local/lib /usr/lib"
+base_bins="`echo $PATH | sed 's/:/\/.. /g'` /local/bin /usr/local/bin /usr/bin"
+base_dirs="$prefix `echo $PATH | sed 's/:/\/.. /g'`"
+
+#
+# Use with_includes and with_libs
+#
+
+for ipath in $more_incs ; do
+	CPPFLAGS="$CPPFLAGS -I$ipath"
+done
+
+for lpath in $more_libs ; do
+	LDFLAGS="$LDFLAGS -L$lpath"
+done
+
+#
+# ----------------------------------------------------------------------
+# Feature setup
+# ----------------------------------------------------------------------
+#
+
+AC_MSG_CHECKING(for server-side support)
+if test "x$enable_server_side" != "xno" ; then
+	AC_MSG_RESULT(yes)
+	FEATURE_SOURCES="$FEATURE_SOURCES skel.cc"
+else
+	AC_MSG_RESULT(disabled)
+	AC_DEFINE(COMBAT_NO_SERVER_SIDE)
+fi
+
+AC_MSG_CHECKING(for combat::ir support)
+if test "x$enable_combat_ir" != "xno" ; then
+	AC_MSG_RESULT(yes)
+	FEATURE_SOURCES="$FEATURE_SOURCES ir.cc"
+else
+	AC_MSG_RESULT(disabled)
+	AC_DEFINE(COMBAT_NO_COMBAT_IR)
+	enable_orbacus_repo=no
+fi
+
+#
+# ----------------------------------------------------------------------
+# Check Tcl setup
+# ----------------------------------------------------------------------
+#
+
+AC_MSG_CHECKING(for tclConfig.sh)
+FP_FIND_FILE(tclConfig.sh,$with_tcl $more_libs $base_libs $base_dirs,lib)
+if test "x$tclConfig_sh" = "x" ; then
+	AC_MSG_RESULT(not found)
+	AC_MSG_ERROR(use --with-tcl to locate tclConfig.sh)
+fi
+AC_MSG_RESULT($tclConfig_sh)
+
+AC_MSG_CHECKING(contents of tcl config)
+. $tclConfig_sh
+AC_MSG_RESULT(done)
+
+AC_MSG_CHECKING(tcl version)
+AC_MSG_RESULT(${TCL_VERSION}${TCL_PATCH_LEVEL})
+
+if test "$TCL_MAJOR_VERSION" -lt 8 ; then
+	AC_MSG_ERROR([oops, I need at least Tcl 8.0, sorry])
+fi
+
+AC_MSG_CHECKING(for tcl.h)
+FP_FIND_FILE(tcl.h,$TCL_PREFIX $TCL_EXEC_PREFIX $TCL_SRC_DIR $with_tcl $more_incs $base_incs $base_dirs, include)
+if test "x$tcl_h_dir" = "x" ; then
+	AC_MSG_RESULT(not found)
+	AC_MSG_ERROR(use --with-tcl to locate tcl.h)
+fi
+AC_MSG_RESULT(found in $tcl_h_dir)
+
+#
+# link loadable module against Tcl's stub library
+#
+
+if test "x$TCL_SUPPORTS_STUBS" = "x1" && test "x$enable_shared" = "xyes" ; then
+	tcllibfile=`eval echo $TCL_STUB_LIB_FILE`
+else
+	tcllibfile=`eval echo $TCL_LIB_FILE`
+fi
+
+tcllibpath=
+for item in $TCL_LIB_SPEC $TCL_BUILD_LIB_SPEC ; do
+	case $item in
+	-L*)
+		tcllibpath="$tcllibpath `echo $item | sed 's/^-L//'`"
+		;;
+	esac
+done
+
+AC_MSG_CHECKING(for $tcllibfile)
+FP_FIND_FILE($tcllibfile,$tcllibpath $TCL_PREFIX $TCL_EXEC_PREFIX $TCL_SRC_DIR $with_tcl $more_libs $base_libs $base_dirs,lib unix,tcl_lib)
+if test "x$tcl_lib_dir" = "x" ; then
+	AC_MSG_RESULT(not found)
+	AC_MSG_ERROR(use --with-tcl to locate $tcllibfile)
+fi
+AC_MSG_RESULT(found in $tcl_lib_dir)
+
+AC_MSG_CHECKING(for thread support in Tcl)
+case $TCL_DEFS in
+*TCL_THREADS*)
+	AC_MSG_RESULT([yes, defining _REENTRANT])
+	CFLAGS="-D_REENTRANT $CFLAGS"
+	CXXFLAGS="-D_REENTRANT $CXXFLAGS"
+	AC_MSG_WARN([note: you may need to add -pthread to CXXFLAGS, LDFLAGS])
+	AC_MSG_WARN([      and LDSOOPTS in the Makefile])
+	;;
+*)
+	AC_MSG_RESULT(no)
+esac
+
+#
+# Tcl setup complete
+#
+
+tcllibflag=`eval echo $TCL_LIB_FLAG`
+
+WHATSHELL="combatsh"
+CPPFLAGS="-I$tcl_h_dir $CPPFLAGS"
+TCL_LDFLAGS="-L$tcl_lib_dir"
+TCL_DEP_LIBS="$TCL_LIBS"
+TCL_LIBS="$tcllibflag $TCL_LIBS"
+
+if test "x$TCL_SUPPORTS_STUBS" = "x1" && test "x$enable_shared" = "xyes" ; then
+	tclstublibflag=`eval echo $TCL_STUB_LIB_FLAG`
+	BUILD_CPPFLAGS="-DUSE_TCL_STUBS $BUILD_CPPFLAGS"
+	LDSOLIBS="$LDSOLIBS $tclstublibflag"
+else
+	LDSOLIBS="$LDSOLIBS $tcllibflag"
+fi
+
+#
+# ----------------------------------------------------------------------
+# Check Mico setup
+# ----------------------------------------------------------------------
+#
+
+have_mico=no
+
+if test "x$orb_to_use" != "x" ; then
+  with_mico=no
+fi
+
+if test "x$with_mico" != "xno" ; then
+	AC_MSG_CHECKING(for mico-setup.sh)
+	if test "x$MICOVERSION" != "x" && test "x$MICODIR" != "x" ; then
+		AC_MSG_RESULT(already loaded)
+		have_mico=yes
+	else
+		FP_FIND_FILE(mico-setup.sh,$with_mico $more_libs $base_libs $base_dirs,lib)
+		if test "x$mico_setup_sh" = "x" ; then
+			AC_MSG_RESULT(not found)
+		else
+			AC_MSG_RESULT($mico_setup_sh)
+			AC_MSG_CHECKING(contents of MICO config)
+			#
+			# mico_config unsets prefix and exec_prefix
+			#
+			save_prefix="$prefix"
+			save_exec_prefix="$exec_prefix"
+			. $mico_setup_sh
+			prefix="$save_prefix"
+			exec_prefix="$save_exec_prefix"
+			AC_MSG_RESULT(done)
+			have_mico=yes
+		fi
+	fi
+fi
+
+if test "x$have_mico" = "xyes" ; then
+	AC_MSG_CHECKING(MICO version)
+	AC_MSG_RESULT($MICOVERSION)
+
+	case $MICOVERSION in
+	[2.[012].*|2.3.[0123])]
+		AC_MSG_WARN([MICO version unusable, need at least 2.3.4])
+		have_mico=no
+		;;
+	[2.[3-9].*)]
+		;;
+	*)
+		AC_MSG_WARN([Unknown MICO version number, expecting 2.3.0 or above.])
+		AC_MSG_WARN([If it doesn't work, use --disable-mico])
+		;;
+	esac
+fi
+
+if test "x$have_mico" = "xyes" ; then
+	AC_MSG_CHECKING(for CORBA.h)
+	FP_FIND_FILE(CORBA.h,$MICODIR $MICOSHARED $with_mico $more_incs $base_incs $base_dirs, include)
+	if test "x$CORBA_h_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-mico to locate CORBA.h)
+	else
+		AC_MSG_RESULT(found in $CORBA_h_dir)
+	fi
+
+	AC_MSG_CHECKING(for libmico${MICOVERSION}${TCL_SHLIB_SUFFIX})
+	FP_FIND_FILE(libmico${MICOVERSION}${TCL_SHLIB_SUFFIX},$MICODIR $MICOSHAREDDIR $with_mico $more_libs $base_libs $base_dirs,lib,mico_lib)
+	if test "x$mico_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_CHECKING(for libmico${MICOVERSION}.a)
+		FP_FIND_FILE(libmico${MICOVERSION}.a,$MICODIR MICOSHAREDDIR $with_mico $more_libs $base_libs $base_dirs,lib,mico_lib)
+	fi
+	if test "x$mico_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)		
+		AC_MSG_ERROR(use --with-mico to locate libmico${MICOVERSION}.so or libmico${MICOVERSION}.a)
+	else
+		AC_MSG_RESULT(found in $mico_lib_dir)
+	fi
+
+	case $MICOVERSION in
+	[2.3.[45])]
+		;;
+	*)
+		AC_MSG_CHECKING(for libmicoir${MICOVERSION}${TCL_SHLIB_SUFFIX})
+		FP_FIND_FILE(libmicoir${MICOVERSION}${TCL_SHLIB_SUFFIX},$mico_lib_dir,lib,micoir_lib)
+		if test "x$micoir_lib_dir" = "x" ; then
+			AC_MSG_RESULT(not found)
+			AC_MSG_CHECKING(for libmicoir${MICOVERSION}.a)
+			FP_FIND_FILE(libmicoir${MICOVERSION}.a,$mico_lib_dir,lib,micoir_lib)
+		fi
+		if test "x$micoir_lib_dir" = "x" ; then
+			AC_MSG_RESULT(not found)		
+		else
+			AC_MSG_RESULT(found in $mico_lib_dir)
+		fi
+		;;
+	esac
+
+	AC_MSG_CHECKING(whether we must use MiniSTL)
+	cat > conftest.c <<EOF
+#include <CORBA.h>
+#ifdef HAVE_MINI_STL
+MiniSTL:yes
+#else
+MiniSTL:no
+#endif
+EOF
+	have_mini_stl=[`${CXX-c++} -I$CORBA_h_dir -E conftest.c 2> /dev/null | grep '^MiniSTL' | cut -d: -f 2`]
+	rm -f conftest.*
+	if test "x$have_mini_stl" != "xyes" && test "x$have_mini_stl" != "xno" ; then
+		have_mini_stl=unknown
+	fi
+	AC_MSG_RESULT($have_mini_stl)
+	if test "x$have_mini_stl" = "xyes" ; then
+		CPPFLAGS="-I$CORBA_h_dir/ministl $CPPFLAGS"
+	fi
+	AC_MSG_CHECKING(for mico-ld)
+	FP_FIND_FILE(mico-ld,$MICODIR $MICOSHAREDDIR $with_mico $base_bins $base_dirs,bin)
+	if test "x$mico_ld" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-mico to locate mico-ld)
+	else
+		AC_MSG_RESULT($mico_ld)
+	fi
+	AC_MSG_CHECKING(MICO dependencies)
+	micodeps=
+	for item in `grep -- -l $mico_ld | tr '"' ' '` ; do
+		case $item in
+		-l*) micodeps="$micodeps $item" ;;
+		esac
+	done
+	AC_MSG_RESULT($micodeps)
+
+	AC_MSG_CHECKING(for idl)
+	FP_FIND_FILE(idl,$MICODIR $MICOSHAREDDIR $with_mico $base_bins $base_dirs,bin)
+	if test "x$idl" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-mico to locate idl)
+	else
+		AC_MSG_RESULT($idl)
+	fi
+
+	AC_MSG_CHECKING(for ird)
+	FP_FIND_FILE(ird,$MICODIR $MICOSHAREDDIR $with_mico $base_bins $base_dirs,bin)
+	if test "x$ird" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-mico to locate ird)
+	else
+		AC_MSG_RESULT($ird)
+	fi
+
+	#
+	# Mico setup complete
+	#
+
+	if test "x$GXX" = "xyes" ; then
+		CXXFLAGS="-ftemplate-depth-42 $CXXFLAGS"
+	fi
+
+	IDL="$idl --c++-skel --poa --no-boa"
+	IFRFEED="$idl --no-codegen-c++ --feed-ir --feed-included-defs"
+	IFRSERVER="$ird"
+	CPPFLAGS="-I$CORBA_h_dir $CPPFLAGS"
+	LDFLAGS="-L$mico_lib_dir $LDFLAGS"
+	LIBS="-lmico$MICOVERSION $micodeps $LIBS"
+	LDSOLIBS="-lmico$MICOVERSION $micodeps $LDSOLIBS"
+
+	if test "x$micoir_lib_dir" != "x" ; then
+		LIBS="-lmicoir$MICOVERSION $LIBS"
+		LDSOLIBS="-lmicoir$MICOVERSION $LDSOLIBS"
+	fi
+fi
+
+if test "x$orb_to_use" = "x" && test "x$have_mico" = "xyes" ; then
+	orb_to_use=MICO
+fi
+
+#
+# ----------------------------------------------------------------------
+# Check ORBacus setup
+# ----------------------------------------------------------------------
+#
+
+have_orbacus=no
+
+if test "x$orb_to_use" != "x" ; then
+  with_orbacus=no
+fi
+
+if test "x$with_orbacus" != "xno" ; then
+	AC_MSG_CHECKING(for OB/CORBA.h)
+	FP_FIND_FILE(OB/CORBA.h,$with_orbacus $more_incs $base_incs $base_dirs,include)
+	if test "x$OB_CORBA_h_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+	else
+		AC_MSG_RESULT(found in $OB_CORBA_h_dir)
+		have_orbacus=yes
+	fi
+fi
+
+if test "x$have_orbacus" = "xyes" ; then
+	AC_MSG_CHECKING(ORBacus version)
+	cat > conftest.c <<EOF
+#include <OB/CORBA.h>
+version:OB_VERSION
+EOF
+	ob_version=[`${CXX-c++} -I$OB_CORBA_h_dir -E conftest.c 2> /dev/null | grep ^version | cut -d: -f 2 | sed 's/[" ]//g'`]
+	rm -f conftest.*
+	if test "x$ob_version" = "x" ; then
+		ob_version=unknown
+	fi
+	AC_MSG_RESULT($ob_version)
+	case $ob_version in
+	3*|4.0a|4.0b1|4.0b2*)
+		AC_MSG_WARN([ORBacus $ob_version unusable, need at least 4.0b3])
+		have_orbacus=no
+		;;
+	4.0b*|4.0|4.0.*)
+		;;
+	4.1|4.1.*)
+		;;
+	*)
+		AC_MSG_WARN([Unknown ORBacus version number, expecting 4.0b3 or above.])
+		AC_MSG_WARN([If it doesn't work, use --disable-orbacus])
+		;;
+	esac
+fi
+
+if test "x$have_orbacus" = "xyes" ; then
+	AC_MSG_CHECKING(for libOB.so)
+	FP_FIND_FILE(libOB.so,$with_orbacus $more_libs $base_libs $base_dirs,lib,ob_lib)
+	if test "x$ob_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_CHECKING(for libOB.a)
+		FP_FIND_FILE(libOB.a,$with_orbacus $more_libs $base_libs $base_dirs,lib,ob_lib)
+	fi
+	if test "x$ob_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbacus to locate libOB.so or libOB.a)
+	else
+		AC_MSG_RESULT(found in $ob_lib_dir)
+	fi
+
+	AC_MSG_CHECKING(for libJTC.so)
+	FP_FIND_FILE(libJTC.so,$with_orbacus $more_libs $base_libs $base_dirs,lib,ob_jtc_lib)
+	if test "x$ob_jtc_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_CHECKING(for libJTC.a)
+		FP_FIND_FILE(libJTC.a,$with_orbacus $more_libs $base_libs $base_dirs,lib,ob_jtc_lib)
+	fi
+	if test "x$ob_jtc_lib_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+
+		case $ob_version in
+		4.0*)
+			AC_MSG_WARN(assuming single-threaded ORBacus)
+			;;
+		4.1|4.1.*)
+			AC_MSG_ERROR(use --with-orbacus to locate libJTC.so or libJTC.a)
+			;;
+		esac
+	else
+		AC_MSG_RESULT(found in $ob_jtc_lib_dir)
+	fi
+
+	if test "x$enable_orbacus_repo" != "xno" ; then
+		AC_DEFINE(COMBAT_ORBACUS_LOCAL_REPO)
+	fi
+
+	AC_MSG_CHECKING(for idl)
+	FP_FIND_FILE(idl,$with_orbacus $base_bins $base_dirs,bin)
+	if test "x$idl" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbacus to locate idl)
+	else
+		AC_MSG_RESULT($idl)
+	fi
+
+	AC_MSG_CHECKING(for irfeed)
+	FP_FIND_FILE(irfeed,$with_orbacus $base_bins $base_dirs,bin)
+	if test "x$irfeed" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbacus to locate irfeed)
+	else
+		AC_MSG_RESULT($irfeed)
+	fi
+
+	AC_MSG_CHECKING(for irserv)
+	FP_FIND_FILE(irserv,$with_orbacus $base_bins $base_dirs,bin)
+	if test "x$irserv" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbacus to locate irserv)
+	else
+		AC_MSG_RESULT($irserv)
+	fi
+
+	#
+	# ORBacus setup complete
+	#
+
+	IDL="$idl --c-suffix .cc"
+	IFRFEED="$irfeed"
+	IFRSERVER="$irserv"
+	CPPFLAGS="-I$OB_CORBA_h_dir $CPPFLAGS"
+	LDFLAGS="-L$ob_lib_dir $LDFLAGS"
+
+	if test "x$ob_jtc_lib_dir" != "x" ; then
+		LIBS="-lJTC $LIBS"
+		LDSOLIBS="-lJTC $LIBS"
+	fi
+
+	LIBS="-lOB $LIBS"
+	LDSOLIBS="-lOB $LDSOLIBS"
+fi
+
+if test "x$orb_to_use" = "x" && test "x$have_orbacus" = "xyes" ; then
+	orb_to_use=ORBacus
+fi
+
+#
+# ----------------------------------------------------------------------
+# Check Orbix setup
+# ----------------------------------------------------------------------
+#
+
+have_orbix=no
+
+if test "x$orb_to_use" != "x" ; then
+  with_orbix=no
+fi
+
+if test "x$with_orbix" != "xno" ; then
+	AC_MSG_CHECKING(for orbix/corba.hh)
+	FP_FIND_FILE(orbix/corba.hh,$with_orbix $ART_INSTALL_PATH $more_incs $base_incs $base_dirs,include cxx/include)
+	if test "x$orbix_corba_hh_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+	else
+		AC_MSG_RESULT(found in $orbix_corba_hh_dir)
+		have_orbix=yes
+	fi
+fi
+
+if test "x$have_orbix" = "xyes" ; then
+	AC_MSG_CHECKING(for libit_art.so)
+	FP_FIND_FILE(libit_art.so,$with_orbix $ART_INSTALL_PATH $more_libs $base_libs $base_dirs,lib cxx/lib)
+	if test "x$libit_art_so_dir" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbix to locate libit_art.so)
+	else
+		AC_MSG_RESULT(found in $libit_art_so_dir)
+	fi
+
+	AC_MSG_CHECKING(for idl)
+	FP_FIND_FILE(idl,$with_orbix $ART_INSTALL_PATH $base_bins $base_dirs,bin)
+	if test "x$idl" = "x" ; then
+		AC_MSG_RESULT(not found)
+		AC_MSG_ERROR(use --with-orbix to locate idl)
+	else
+		AC_MSG_RESULT($idl)
+	fi
+
+	AC_MSG_CHECKING(Orbix version)
+	orbix_version=[`$idl -V 2>&1 | grep Version | sed 's/^.*Version //'`]
+	if test "x$orbix_version" = "x" ; then
+		orbix_version=unknown
+	fi
+	AC_MSG_RESULT($orbix_version)
+
+	#
+	# Orbix setup complete
+	#
+
+	IDL="$idl -base:-ccc:-hh -poa:-ccc:-hh"
+	CPPFLAGS="-D_REENTRANT -I$orbix_corba_hh_dir $CPPFLAGS"
+	LDFLAGS="-L$libit_art_so_dir $LDFLAGS"
+	LIBS="-lit_dynany -lit_poa -lit_art -lit_itl -lit_ts -lit_base -lpthread $LIBS"
+	LDSOLIBS="-lit_dynany -lit_poa -lit_art -lit_itl -lit_ts -lit_base -lpthread $LDSOLIBS"
+fi
+
+if test "x$orb_to_use" = "x" && test "x$have_orbix" = "xyes" ; then
+	orb_to_use=Orbix
+fi
+
+#
+# ----------------------------------------------------------------------
+# Generic ORB setup
+# ----------------------------------------------------------------------
+#
+
+have_generic_orb=no
+
+if test "x$orb_to_use" != "x" ; then
+  with_generic_orb=no
+fi
+
+if test "x$with_generic_orb" = "xyes" ; then
+	for incdir in $more_incs ; do
+		CPPFLAGS="$CPPFLAGS -I$incdir"
+	done
+	for libdir in $more_libs ; do
+		LDFLAGS="$LDFLAGS -L$libdir"
+	done
+	AC_MSG_CHECKING(for defines-generic.h)
+	AC_TRY_CPP([
+#include "defines-generic.h"
+],could_preprocess=true,could_preprocess=false)
+	if test "x$could_preprocess" != "xtrue" ; then
+		AC_MSG_RESULT(did not work)
+		AC_MSG_WARN([Before configuring with --with-generic-orb, you must edit])
+		AC_MSG_WARN([defines-generic.h to reflect your ORB's include files.])
+		AC_MSG_WARN([See INSTALL and defines-generic.h for further information.])
+		AC_MSG_ERROR([check config.log and edit defines-generic.h])
+	else
+		AC_MSG_RESULT(ok)
+		have_generic_orb=yes
+	fi
+fi
+
+if test "x$have_generic_orb" != "xno" ; then
+	LIBS="$with_generic_orb_lib $LIBS"
+	LDSOLIBS="$with_generic_orb_lib $LDSOLIBS"
+
+	AC_MSG_CHECKING(compilation of simple prog)
+	AC_TRY_COMPILE([
+#include "defines-generic.h"
+], [
+  int myargc;
+  char *myargv[] = { "foo", NULL };
+  CORBA::ORB_var orb = CORBA::ORB_init (myargc, myargv);
+],could_compile=ok,could_compile=failed)
+	AC_MSG_RESULT($could_compile)
+
+	if test "x$could_compile" != "xok" ; then
+		AC_MSG_ERROR([check config.log and re-edit defines-generic.h])
+	fi
+
+	AC_MSG_CHECKING(link of simple prog)
+	AC_TRY_LINK([
+#include "defines-generic.h"
+], [
+  int myargc;
+  char *myargv[] = { "foo", NULL };
+  CORBA::ORB_var orb = CORBA::ORB_init (myargc, myargv);
+],could_link=ok,could_link=failed)
+	AC_MSG_RESULT($could_link)
+
+	if test "x$could_link" != "xok" ; then
+		AC_MSG_ERROR([check config.log and use --with-generic-orb-lib])
+	fi
+
+	could_link=no
+	AC_MSG_CHECKING(for POA and DynamicAny::DynAny support)
+	AC_TRY_LINK([
+#include "defines-generic.h"
+], [
+  int myargc;
+  char *myargv[] = { "foo", NULL };
+  CORBA::ORB_var orb = CORBA::ORB_init (myargc, myargv);
+  CORBA::Object_var obj = orb->resolve_initial_references ("RootPOA");
+  PortableServer::POA_var poa = PortableServer::POA::_narrow (obj);
+  obj = orb->resolve_initial_references ("DynAnyFactory");
+  DynamicAny::DynAnyFactory_var daf = DynamicAny::DynAnyFactory::_narrow (obj);
+  DynamicAny::DynAny_var da = daf->create_dyn_any_from_type_code (CORBA::_tc_string);
+  return 0;
+],could_link=ok,could_link=failed)
+	AC_MSG_RESULT($could_link)
+
+	if test "x$could_link" != "xok" ; then
+		AC_MSG_ERROR([check config.log to see what went wrong])
+	fi
+
+	#
+	# generic ORB setup complete
+	#
+fi
+
+if test "x$orb_to_use" = "x" && test "x$have_generic_orb" = "xyes" ; then
+	orb_to_use=generic
+fi
+
+#
+# ----------------------------------------------------------------------
+# Miscellaneous
+# ----------------------------------------------------------------------
+#
+
+#
+# ORB setup
+#
+
+AC_MSG_CHECKING(ORB to use)
+case $orb_to_use in
+MICO)
+	AC_MSG_RESULT([MICO, version $MICOVERSION])
+	AC_DEFINE(COMBAT_USE_MICO)
+	if test "x$enable_mico_dispatcher" != "xno" ; then
+		ORB_SOURCES="event-mico.cc mico-binder.cc"
+	else
+		ORB_SOURCES="event-corba.cc mico-binder.cc"
+	fi
+	;;
+ORBacus)
+	AC_MSG_RESULT([ORBacus, version $ob_version])
+	AC_DEFINE(COMBAT_USE_ORBACUS)
+	ORB_SOURCES="event-corba.cc"
+	;;
+Orbix)
+	AC_MSG_RESULT([Orbix, version $orbix_version])
+	AC_DEFINE(COMBAT_USE_ORBIX)
+	ORB_SOURCES="event-corba.cc"
+	;;
+generic)
+	AC_MSG_RESULT([generic ORB, unknown version])
+	ORB_SOURCES="event-corba.cc"
+	AC_MSG_WARN([Attempting to compile with generic ORB configuration.])
+	AC_MSG_WARN([You may still have to tweak the Makefile. Good luck.])
+	;;
+*)
+	AC_MSG_RESULT(none)
+	AC_MSG_ERROR([no ORB found, check ./configure --help])
+	;;
+esac
+
+ORB=$orb_to_use
+
+#
+# Adjustments for native compilers
+#
+
+if test "x$GXX" != "xyes" ; then
+case $system in
+HP-UX-*)
+	CC=$CXX
+	MAKE_REPO='-$(CXX) $(OBJS) $(LDFLAGS) $(LIBS)'
+	;;
+AIX-*)
+	CC=cc
+	;;
+SunOS-*)
+	CC=cc
+	;;
+esac
+fi
+
+#
+# Do we try dynamic linking
+#
+
+AC_MSG_CHECKING(whether to build shared libcombat)
+if test "x$enable_shared" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	SOEXT=$TCL_SHLIB_SUFFIX
+	LIBRARY=libcombat$SOEXT
+	TARGET="$LIBRARY $WHATSHELL"
+else
+	AC_MSG_RESULT(no)
+	SOEXT=".unknown"
+	LIBRARY=libcombat.a
+	TARGET=$WHATSHELL
+fi
+
+if test "x$enable_shared" = "xyes" ; then
+if test "x$GXX" = "xyes" ; then
+	AC_MSG_CHECKING(shared library compile flags)
+	AC_MSG_RESULT($TCL_SHLIB_CFLAGS)
+	BUILD_CFLAGS="$TCL_SHLIB_CFLAGS $BUILD_CFLAGS"
+	AC_MSG_CHECKING(shared library linker)
+	LDSO="$CXX -shared $TCL_SHLIB_CFLAGS"
+	AC_MSG_RESULT($LDSO)
+	AC_MSG_CHECKING(shlib dependencies)
+	LDSOLIBS="$LDSOLIBS -lstdc++"
+	AC_MSG_RESULT($LDSOLIBS)
+else
+	AC_MSG_CHECKING(shared library compile flags)
+	AC_MSG_RESULT($TCL_SHLIB_CFLAGS)
+	BUILD_CFLAGS="$TCL_SHLIB_CFLAGS $BUILD_CFLAGS"
+	#
+	# Try the linker flags from $TCL_SHLIB_LD, stripping the first
+	# word of it (the compiler name), which we replace with the C++
+	# compiler
+	#
+	MY_SHLIB_LD_FLAGS="`echo \"$TCL_SHLIB_LD\" | cut -d\" \" -f2-`"
+	AC_MSG_CHECKING(shared library linker)
+	LDSO="$CXX $MY_SHLIB_LD_FLAGS $TCL_SHLIB_CFLAGS"
+	AC_MSG_RESULT($LDSO)
+	AC_MSG_CHECKING(shlib dependencies)
+	if test "x$TCL_SHLIB_LD_LIBS" != "x" ; then
+		LDSOLIBS="$LDSOLIBS -lstdc++"
+	else
+		LDSOLIBS=""
+	fi
+	AC_MSG_RESULT($LDSOLIBS)
+	AC_MSG_WARN([please check compiler/linker flags for correctness])
+fi
+fi
+
+#
+# Finalize
+#
+
+if test "x$MAKE_REPO" = "x" ; then
+	MAKE_REPO='-:'
+fi
+
+AC_SUBST(TARGET)
+AC_SUBST(WHATSHELL)
+AC_SUBST(LIBRARY)
+AC_SUBST(CC)
+AC_SUBST(CXX)
+AC_SUBST(CFLAGS)
+AC_SUBST(CPPFLAGS)
+AC_SUBST(CXXFLAGS)
+AC_SUBST(BUILD_CFLAGS)
+AC_SUBST(BUILD_CPPFLAGS)
+AC_SUBST(LD)
+AC_SUBST(LDFLAGS)
+AC_SUBST(LIBS)
+AC_SUBST(LDSO)
+AC_SUBST(SOEXT)
+AC_SUBST(LDSOOPTS)
+AC_SUBST(LDSOLIBS)
+AC_SUBST(MAKE_REPO)
+AC_SUBST(TCL_LDFLAGS)
+AC_SUBST(TCL_LIBS)
+AC_SUBST(ORB)
+AC_SUBST(IDL)
+AC_SUBST(IFRFEED)
+AC_SUBST(IFRSERVER)
+AC_SUBST(ORB_SOURCES)
+AC_SUBST(FEATURE_SOURCES)
+AC_OUTPUT(Makefile MakeVars idl2tcl)

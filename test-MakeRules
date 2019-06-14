@@ -1,0 +1,75 @@
+#
+# ----------------------------------------------------------------------
+# Make Rules for Combat's tests and demos. For simplicity, we assume
+# that the IDL file is called test.idl and that the C++ server imple-
+# mentation is called server.cc
+# ----------------------------------------------------------------------
+#
+
+export PATH            := $(MAINPATH):$(PATH)
+export LD_LIBRARY_PATH := $(MAINPATH):$(LD_LIBRARY_PATH)
+export LIBPATH         := $(MAINPATH):$(LIBPATH)
+export SHLIB_PATH      := $(MAINPATH):$(SHLIB_PATH)
+
+ifeq ($(ORB),MICO)
+SKELSRC  = test_skel.cc
+SKELFILE = test_skel.o
+ALLSKEL  = test_skel.cc
+ALLOBJ   = test_skel.o test.o
+endif
+ifeq ($(ORB),ORBacus)
+SKELSRC  = test_skel.cc
+SKELFILE = test_skel.o
+ALLSKEL  = test_skel.cc test_skel.h
+ALLOBJ   = test_skel.o test.o
+endif
+ifeq ($(ORB),Orbix)
+SKELSRC  = testS.cc
+SKELFILE = testS.o
+ALLSKEL  = testS.cc testS.h testC.cc
+ALLOBJ   = testS.o testC.o
+endif
+
+
+.SUFFIXES :
+.SUFFIXES : .tcl .cc .h .o .idl
+
+.idl.cc:
+	$(IDL) $<
+
+.idl.h:
+	$(IDL) $<
+
+.idl.tcl:
+	idl2tcl $<
+
+.cc.o:
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $<
+
+clean:
+	rm -rf server $(ALLSKEL) test.cc test.h server.h
+	rm -rf server*.ior nsd.ior core *~ *.o
+
+distclean:	clean
+
+purge:		distclean
+	rm -f test.tcl CosNaming.tcl
+
+server:	$(ALLOBJ) server.o
+	$(LD) -o $@ server.o $(ALLOBJ) $(LDFLAGS) $(LIBS)
+
+server.h: $(MAINPATH)/test-server.h
+	cp $(MAINPATH)/test-server.h server.h
+
+test.o:		test.cc
+test.cc test.h:	test.idl
+server.o:	server.cc server.h
+test.tcl:	test.idl
+
+$(SKELFILE):	$(SKELSRC)
+$(SKELSRC):	test.h
+
+ifeq ($(ORB),Orbix)
+testC.o:	testC.cc
+testC.cc:	test.h
+endif

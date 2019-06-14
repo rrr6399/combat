@@ -1,0 +1,212 @@
+
+----------------------------------------------------------------------
+Combat Installation
+----------------------------------------------------------------------
+
+Combat requires a CORBA 2.3 ORB with C++ language mapping. Explicitly
+supported are MICO 2.3.9 and ORBacus 4.0.5. There is also a configuration
+setting for a "generic 2.3 ORB". Your mileage may vary. See also the "ORB
+Notes" pararaph in README.
+
+On the Tcl end, Combat requires Tcl 8.0 (8.1 or up is recommended, support
+for Tcl 8.0 may be dropped soon). For server-side scripting, you need Tcl
+8.0.3 and [incr Tcl] 3.0. This version of Combat has been tested against
+Tcl 8.0.3, 8.2.2 and Tcl 8.3.0.
+
+A simple "./configure" followed by "make" should build the package.
+"make" by defaults builds the static `libcombat.a' library and a new
+tclsh, `combatsh', that includes the Combat package.
+
+You may want to use "./configure --enable-shared" to build Combat as a
+dynamically loadable module that can be loaded into both tclsh and wish
+using Tcl's "load" command. However, this is highly system dependent.
+This option is disabled by default to be on the safe side.
+
+Building Combat as a loadable module is supported, if
+
+  - your OS is Linux or Solaris
+  - your compiler is gcc 2.95 or 3.2 or greater
+  - you have a shared libstdc++ (you need to configure gcc
+    with --enable-shared)
+  - the libraries that Combat depends on are shared libraries. This
+    includes the ORB, and the libraries the ORB depends on (like -lssl).
+
+Other configurations are unsupported. If you are using gcc, then Combat
+will try building a shared library using "c++ -shared"; otherwise it will
+try using the linker parameters determined by Tcl. If this does not work,
+you may have to edit the Makefile manually.
+
+
+Configuration Options:
+----------------------
+
+./configure accepts the following parameters:
+
+
+1.) Basic options
+
+  --with-tcl=dir          If not found automatically, search the tcl con-
+                          figuration file, tclConfig.sh, below the given
+                          directogiven directory.
+
+2.) ORB selection options
+
+  --with-mico=dir         If not found automatically, search MICO files
+                          (mico-setup.sh, libmico, etc.) below the given
+                          directory.
+
+  --disable-mico-dispatcher (MICO specific) Normally, Combat uses a custom
+                          dispatcher with MICO. Use this option to use the
+                          generic CORBA event handler instead.
+
+  --with-orbacus=dir      If not found automatically, search ORBacus files
+                          (OB/CORBA.h, libOB) below the given directory.
+
+  --disable-orbacus-repo  (ORBacus specific) Combat supports autostarting an
+                          external irserv process if no Interface Repository
+                          is available upon combat::ir. Use this option to
+                          disable the feature.
+
+  --with-generic-orb      Use other CORBA 2.3 ORB. Before using this option,
+                          you _must_ edit `defines-generic.h' to include the
+                          proper files and to set a few options. You must
+                          also use the following --with-generic-orb-lib
+                          option to set the libraries that need to be linked
+                          in. Use --with-includes and --with-libs (see below)
+                          if include files or libraries are in a nonstandard
+                          location.
+
+  --with-generic-orb-lib=libs (Generic ORB only) Add `libs' to the command
+                          line when linking executables, i.e.
+                          --with-generic-orb-lib=-lmico2.3.6
+
+3.) Combat feature options
+
+  --enable-shared         Try to build Combat as a loadable module that
+                          can be loaded into the Tcl interpreter at run-
+                          time. See discussion above.
+
+  --enable-debug          Compile with -g to include debugging information.
+
+  --disable-server-side   Disables support for server-side Tcl scripting.
+                          This results in a much smaller combat binary.
+
+  --disable-combat-ir     Disables the combat::ir command to further slim
+                          down the combat binary. Read the docs for what
+                          you'll be missing. This will also cause idl2tcl,
+                          the test suite and the demos to stop working.
+                          You have been warned.
+
+4.) Additional paths setup
+
+  --with-includes=dirs    : separated list of directories where to look for
+                          include files, i.e. --with-includes=/opt/include
+
+  --with-libs=dirs        : separated list of directories where to look for
+                          libraries, i.e. --with-libs=/opt/lib:/opt/local
+
+
+Caveats and Hints:
+  * Perform some sanity checks on the values printed by the configuration
+    script, for example:
+     - Does the C++ compiler match the one used by your ORB? Else, set
+       the CXX environment variable and rerun configure.
+     - Do the version numbers and paths reported for Tcl match your expec-
+       tations? Else, use --with-tcl to point to the correct tclConfig.sh
+       file.
+
+  * Some pre-packaged installations of Tcl do not come with the
+    necessary include files, or omit Tcl's configuration file,
+    tclConfig.sh. Both are mandatory. If you have a preinstalled Tcl
+    installation, and the configuration script complains, be prepared
+    to rebuild Tcl from source.
+
+  * When Combat is built as a loadable module, make sure that Tcl has been
+    built with the same compiler you use for Combat. I have verified a case
+    where exceptions failed to work (i.e. caused a crash) when a gcc 2.95-
+    compiled libcombat.so was loaded into an old (probably egcs 1.0-compiled)
+    tclsh (on Linux).
+
+  * The configuration process first looks for MICO, then ORBacus, and only
+    then for a generic ORB. Use --without-mico or --without-orbacus to make
+    configure ignore these ORBs.
+
+  * Note that the idl2tcl program needs ORB-specific knowledge about how to
+    run an Interface Repository. Consequently, it does not work when Combat
+    is configured to use a "generic ORB".
+
+  * Combat works just fine with Tk (i.e. wish). To use Combat in wish, it's
+    easiest to build Combat as a loadable module (using --enable-shared).
+    If this is not possible, grab tkAppInit.c from your Tk installation,
+    add a call to Combat_Init(interp) in Tcl_AppInit(), and off you go. The
+    reason this is not done automatically is just the explosion of options
+    (Tcl, Tcl+Tk, Tcl+[incr Tcl], Tcl+Tk+[incr Tcl]).
+
+
+Testing the Installation
+------------------------
+
+Before doing anything else, you should check if the build succeeded.
+
+1. Testing combatsh
+
+First, make sure your incarnation of LD_LIBRARY_PATH (on HP/UX: SHLIB_PATH,
+on AIX: LIBPATH) is set up correctly so that all dependent shared libraries
+are found. You can test which shared libraries are required by running
+`ldd combatsh' (on Linux/SunOS), `chatr combatsh' (on HP/UX), or
+`dump -H combatsh' (on AIX).
+
+Now try to execute combatsh and see if the tcl interpreter comes up
+without any errors. Then try the following two commands
+
+  package require combat
+  corba::init
+
+The first should print the current Combat version, the latter should
+print nothing.
+
+2. Testing the loadable module
+
+First, make sure your incarnation of LD_LIBRARY_PATH (on HP/UX: SHLIB_PATH,
+on AIX: LIBPATH) is set up correctly so that all dependent shared libraries
+are found. You can test which shared libraries are required by running
+`ldd libcombat.so' (on Linux/SunOS), `chatr libcombat.sl' (on HP/UX), or
+`dump -H libcombat.so' (on AIX).
+
+Now start a plain tclsh and try to load the module using
+
+  load ./libcombat[info sharedlibextension]
+
+There are two reasons why this might fail:
+
+  * "File not found"
+    This error is reported by the dynamic linker if either the path to
+    the module is incorrect (don't forget the ./ above), or if one of
+    the required libraries (mico, stdc++ etc.) is not found. Check
+    LD_LIBRARY_PATH.
+
+  * "Unresolved symbols"
+    The configuration script failed to find all dependencies. If you
+    can figure out the problem, send a mail to the author. Otherwise,
+    use the static build instead.
+
+If the library loads, try the following two commands
+
+  package require combat
+  corba::init
+
+The first should print the current Combat version, the latter should
+print nothing.
+
+
+More Tests
+----------
+
+If Combat is up and running, you can run more serious tests with
+
+  make test
+
+When not using one of the supported ORBs, you have to hack the files
+test-server.h and test-MakeRules in order to build/run the test suite.
+
+Please report any problems with the testsuite to the author.

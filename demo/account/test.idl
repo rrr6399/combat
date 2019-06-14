@@ -1,0 +1,14 @@
+interface Account {
+  exception Bankrupt {
+    unsigned long balance;
+    unsigned long amount;
+  };
+  void deposit  (in unsigned long amount);
+  void withdraw (in unsigned long amount) raises (Bankrupt);
+  long balance  ();
+  void destroy  ();
+};
+
+interface Bank {
+  Account create ();
+};

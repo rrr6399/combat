@@ -1,0 +1,27 @@
+#! /bin/sh
+# \
+exec ../../combatsh "$0" ${1+"$@"}
+
+#
+# Initialize ORB and feed the local Interface Repository
+#
+
+eval corba::init $argv
+source Random.tcl
+mico::ir add $_ir_Random
+
+#
+# Connect to the server. Its reference is in ./Random.ior
+#
+
+set obj [corba::string_to_object file://[pwd]/Random.ior]
+
+#
+# Show some random numbers
+#
+
+puts "Some random numbers:"
+
+for {set i 0} {$i < 10} {incr i} {
+    puts [$obj lrand48]
+}

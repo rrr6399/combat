@@ -1,0 +1,31 @@
+
+This directory contains some subdirectories with Combat demonstrations.
+So far, demos are scarce; but you can find more examples of Combat pro-
+gramming by looking at the test cases in the subdirectories of ../test.
+
+You can either say "make" in this directory, which compiles all demos,
+or you can go to any of the demos directly and say "make" there. All
+demos come with a Tcl client, and some with a C++ and a Tcl server.
+If you compiled Combat with [incr Tcl], the Tcl server is used, else
+the demos use the C++ implementation.
+
+Note that a lot of magic is spent to make the C++ demos compile and link
+with the various supported ORBs. As a result, the Makefiles for C++ tar-
+gets are overly complicated. A side effect is that all IDL files that are
+used to build a C++ server are called "test.idl".
+
+hello-1:
+	A trivial "Hello World" example. There is both a C++ and a Tcl
+	server, and a Tcl client. Run `make', then `./hello'.
+
+account:
+	A more complex example. A Bank object (factory) creates	references
+	to "virtual" account objects, which are then incarnated by a Servant
+	Manager on request. There is a Tcl client and both a C++ and a Tcl
+	server. Run `make', then `./account'.
+
+random:
+	A client-only example that should run out of the box. It connects
+	to a public CORBA service that provides true random numbers. See
+	http://www.random.org/. Running the demo requires a live Internet
+	connection. Run `./random'.

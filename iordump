@@ -1,0 +1,619 @@
+#! /bin/sh
+#
+# Uncomment this line if you know where your tclsh lives
+#
+# exec tclsh8.2 "$0" ${1+"$@"}
+#
+# Try to find a suitable tclsh8.x
+# \
+tcl="`which tclsh8.3`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
+tcl="`which tclsh8.2`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
+tcl="`which tclsh8.1`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
+tcl="`which tclsh`" ; if test -f "$tcl" ; then exec $tcl "$0" ${1+"$@"} ; fi
+# \
+echo "oops, could not find tclsh8.[123], please edit $0" ; exit 1
+#
+
+#
+# ----------------------------------------------------------------------
+# Pure-Tcl IOR decoder                 written by Frank Pilhofer in 2000
+#                                     distributed under terms of the GPL
+# ----------------------------------------------------------------------
+#
+
+if {[catch {package require Tcl 8.1}]} {
+    puts "oops, I need at least Tcl 8.1"
+    exit 1
+}
+
+proc usage {} {
+    global argv0
+    puts stderr "usage: $argv0 ?ior-string-or-file?"
+    puts stderr "  You can pass either an IOR string or the name of a file containing an IOR"
+    puts stderr "  string on the command line. If the command line is empty, an IOR string"
+    puts stderr "  is read from standard input instead. Only stringified IORs that begin"
+    puts stderr "  with the IOR: `magic' are acceptable (i.e. no INS-style references that"
+    puts stderr "  would require an ORB for interpretation)."
+    exit 1
+}
+
+if {[llength $argv] > 1} {
+    usage
+} elseif {[llength $argv] == 1} {
+    if {[string index [lindex $argv 0] 0] == "-"} {
+	usage
+    }
+    set ior [string trim [lindex $argv 0]]
+} else {
+    set ior [string trim [gets stdin]]
+}
+
+if {[string range $ior 0 3] != "IOR:"} {
+    #
+    # Try to read IOR from that file
+    #
+
+    if {![file exists $ior]} {
+	puts "error: not an IOR:-style object reference and not a file: $ior"
+	usage
+    }
+    if {[catch {set file [open $ior]} res]} {
+	puts "error: cannot open $ior: $res"
+	exit 1
+    }
+    set nior [string trim [read -nonewline $file]]
+    close $file
+
+    if {[string range $nior 0 3] != "IOR:"} {
+	puts "error: file $ior did not contain an IOR:-style object reference"
+	exit 1
+    }
+    set ior $nior
+}
+
+#
+# ----------------------------------------------------------------------
+# procs to read CDR data
+# ----------------------------------------------------------------------
+#
+
+#
+# backported from an [incr Tcl] class
+#
+
+namespace eval Combat {
+    namespace eval CDR {
+	namespace eval Decoder {
+	    variable data
+	    variable index
+	    variable size
+	    variable byteorder 	;# 0 big-endian, 1 little-endian
+
+	    #
+	    # byteorder can be 0 for big-endian or 1 for little-endian
+	    #
+
+	    proc constructor {_data _byteorder} {
+		variable data
+		variable index
+		variable size
+		variable byteorder
+
+		set data $_data
+		set index 0
+		set size [::string length $data]
+		set byteorder $_byteorder
+	    }
+
+	    proc align {alignment} {
+		variable index
+		if {($index % $alignment) != 0} {
+		    set increment [expr {$alignment - ($index % $alignment)}]
+		    incr index $increment
+		}
+	    }
+
+	    proc tell {} {
+		variable index
+		return $index
+	    }
+
+	    proc seek {pos} {
+		variable index
+		set index $pos
+	    }
+
+	    proc char {} {
+		variable index
+		variable data
+		if {[binary scan $data @[set index]a res] != 1} {
+		    error "CDR::Decoder::char"
+		}
+		incr index
+		return $res
+	    }
+
+	    proc octet {} {
+		return [char]
+	    }
+
+	    proc octets {length} {
+		variable index
+		variable data
+		if {[binary scan $data @[set index]a[set length] res] != 1} {
+		    error "CDR::Decoder::octets"
+		}
+		incr index $length
+		return $res
+	    }
+	    
+	    proc short {} {
+		variable index
+		variable data
+		variable byteorder
+		
+		align 2
+
+		if {$byteorder == 0} {
+		    set code [binary scan $data @[set index]S res]
+		} else {
+		    set code [binary scan $data @[set index]s res]
+		}
+		
+		if {$code != 1} {
+		    error "CDR::Decoder::short"
+		}
+		
+		incr index 2
+		return $res
+	    }
+	    
+	    proc ushort {} {
+		return [expr {([short] + 0x10000) % 0x10000}]
+	    }
+	    
+	    proc long {} {
+		variable index
+		variable data
+		variable byteorder
+
+		align 4
+		
+		if {$byteorder == 0} {
+		    set code [binary scan $data @[set index]I res]
+		} else {
+		    set code [binary scan $data @[set index]i res]
+		}
+		
+		if {$code != 1} {
+		    error "CDR::Decoder::long"
+		}
+		
+		incr index 4
+		return $res
+	    }
+	    
+	    #
+	    # XXX what to do if res > 0x7fffffff ?
+	    #
+	    
+	    proc ulong {} {
+		return [long]
+	    }
+	    
+	    #
+	    # XXX hmm ...
+	    #
+	    
+	    proc longlong {} {
+		error "longlong not supported by CDR decoder"
+	    }
+	    
+	    proc ulonglong {} {
+		error "ulonglong not supported by CDR decoder"
+	    }
+	    
+	    #
+	    # groan ... Tcl only handles native floating point values
+	    #
+	    
+	    proc float {} {
+		variable index
+		variable data
+		variable byteorder
+
+		align 4
+		
+		if {$byteorder == 0} {
+		    set code [binary scan $data @[set index]cccc se1 e2f1 f2 f3]
+		} else {
+		    set code [binary scan $data @[set index]cccc f3 f2 e2f1 se1]
+		}
+		
+		if {$code != 4} {
+		    error "CDR::Decoder::float"
+		}
+		
+		set se1  [expr {($se1 + 0x100) % 0x100}]
+		set e2f1 [expr {($e2f1 + 0x100) % 0x100}]
+		set f2   [expr {($f2 + 0x100) % 0x100}]
+		set f3   [expr {($f3 + 0x100) % 0x100}]
+		
+		set sign [expr {$se1 >> 7}]
+		set exponent [expr {(($se1 & 0x7f) << 1 | ($e2f1 >> 7))}]
+		set f1 [expr {$e2f1 & 0x7f}]
+		
+		set fraction [expr {double($f1)*0.0078125 + \
+			double($f2)*3.0517578125e-05 + \
+			double($f3)*1.19209289550781e-07}]
+		
+		set res [expr {($sign ? -1. : 1.) * \
+			pow(2,$exponent-127) * \
+			(1 + $fraction)}]
+		
+		incr index 4
+		return $res
+	    }
+
+	    proc double {} {
+		variable index
+		variable data
+		variable byteorder
+
+		align 8
+		
+		if {$byteorder == 0} {
+		    set code [binary scan $data @[set index]cccccccc \
+			    se1 e2f1 f2 f3 f4 f5 f6 f7]
+		} else {
+		    set code [binary scan $data @[set index]cccccccc \
+			    f7 f6 f5 f4 f3 f2 e2f1 se1]
+		}
+		
+		set se1  [expr {($se1 + 0x100) % 0x100}]
+		set e2f1 [expr {($e2f1 + 0x100) % 0x100}]
+		set f2   [expr {($f2 + 0x100) % 0x100}]
+		set f3   [expr {($f3 + 0x100) % 0x100}]
+		set f4   [expr {($f4 + 0x100) % 0x100}]
+		set f5   [expr {($f5 + 0x100) % 0x100}]
+		set f6   [expr {($f6 + 0x100) % 0x100}]
+		set f7   [expr {($f7 + 0x100) % 0x100}]
+		
+		if {$code != 8} {
+		    error "CDR::Decoder::double"
+		}
+		
+		set sign [expr {$se1 >> 7}]
+		set exponent [expr {(($se1 & 0x7f) << 4 | ($e2f1 >> 4))}]
+		set f1 [expr {$e2f1 & 0x0f}]
+		
+		set fraction [expr {double($f1)*0.0625 + \
+			double($f2)*0.000244140625 + \
+			double($f3)*9.5367431640625e-07 + \
+			double($f4)*3.7252902984619141e-09 + \
+			double($f5)*1.4551915228366852e-11 + \
+			double($f6)*5.6843418860808015e-14 + \
+			double($f7)*2.2204460492503131e-16}]
+		
+		set res [expr {($sign ? -1. : 1.) * \
+			pow(2,$exponent-1023) * \
+			(1 + $fraction)}]
+		
+		incr index 8
+		return $res
+	    }
+
+	    proc longdouble {} {
+		error "CDR::Decoder::longdouble not implemented yet"
+	    }
+	    
+	    proc boolean {} {
+		variable index
+		variable data
+
+		if {[binary scan $data @[set index]c res] != 1} {
+		    error "CDR::Decoder::boolean"
+		}
+		if {$res != 0 && $res != 1} {
+		    error "illegal boolean value $res"
+		}
+		incr index
+		return $res
+	    }
+	    
+	    proc string {} {
+		variable index
+		variable data
+
+		#
+		# length includes the trailing null, which we don't want
+		#
+		
+		set length [ulong]
+		set dlength [expr {$length - 1}]
+		set code [binary scan $data @[set index]a[set dlength] res]
+		
+		if {$code != 1} {
+		    error "CDR::Decoder::string"
+		}
+		
+		incr index $length
+		return $res
+	    }
+	}
+    }
+}
+
+#
+# ----------------------------------------------------------------------
+# Procs to read info from the IOP::IOR structure
+# ----------------------------------------------------------------------
+#
+
+proc DumpOctets {desc data} {
+    set index 0
+
+    while {$index < [string length $data]} {
+	if {$index == 0} {
+	    puts -nonewline "[format %12s $desc]  "
+	} else {
+	    puts -nonewline "              "
+	}
+
+	set count [binary scan $data \
+		@[set index]H2H2H2H2H2H2H2H2H2H2H2H2H2H2H2H2 \
+		c(0) c(1) c(2) c(3) c(4) c(5) c(6) c(7) c(8) \
+		c(9) c(10) c(11) c(12) c(13) c(14) c(15) c(16)]
+
+	for {set i 0} {$i < $count} {incr i} {
+	    puts -nonewline "$c($i) "
+	}
+	for {} {$i < 16} {incr i} {
+	    puts -nonewline "   "
+	}
+
+	binary scan $data \
+		@[set index]cccccccccccccccc \
+		c(0) c(1) c(2) c(3) c(4) c(5) c(6) c(7) c(8) \
+		c(9) c(10) c(11) c(12) c(13) c(14) c(15) c(16)
+
+	for {set i 0} {$i < $count} {incr i} {
+	    #
+	    # Printable ISOLatin1 characters according to the
+	    # Red Book (Postscript RM)
+	    #
+	    if {($c($i) >= 0040 && $c($i) <= 0176) || \
+		    ($c($i) >= 0220 && $c($i) != 0231 && $c($i) != 0234)} {
+		puts -nonewline "[string index $data [expr $index + $i]]"
+	    } else {
+		puts -nonewline "."
+	    }
+	}
+
+	puts ""
+	incr index $count
+    }
+}
+
+proc DecodeIIOPProfile {} {
+    puts "IIOP Profile"
+    
+    set major [Combat::CDR::Decoder::octet]
+    set minor [Combat::CDR::Decoder::octet]
+
+    set c1 [binary scan $major c1 ascii_major]
+    set c2 [binary scan $minor c1 ascii_minor]
+
+    if {$c1 != 1 || $c2 != 1} {
+	puts "oops, cannot decipher IIOP version"
+	return
+    }
+
+    puts "    Version:  $ascii_major.$ascii_minor"
+
+    if {$ascii_major != 1} {
+	puts "oops, unsupported IIOP version, was expecting 1"
+    }
+
+    set host [Combat::CDR::Decoder::string]
+    set port [Combat::CDR::Decoder::ushort]
+    set klen [Combat::CDR::Decoder::ulong]
+    set key  [Combat::CDR::Decoder::octets $klen]
+
+    puts "    Address:  $host:$port"
+    DumpOctets "Key:" $key
+
+    if {$ascii_minor >= 1} {
+	set compcount [Combat::CDR::Decoder::ulong]
+	if {$compcount > 0} {
+	    puts ""
+	}
+	for {set cindex 0} {$cindex < $compcount} {incr cindex} {
+	    DecodeTaggedComponent
+	    puts ""
+	}
+    }
+}
+
+proc DecodeORBTypeTag {} {
+    set orb_type [Combat::CDR::Decoder::ulong]
+    puts "ORB Type Tag"
+    puts "   ORB Type:  $orb_type"
+}
+
+array set codesets {
+    0x00010001 {ISO 8859-1:1987; Latin Alphabet No. 1}
+    0x00010020 {ISO 646:1991 IRV; US-ASCII}
+    0x00010100 {ISO/IEC 10646-1:1993; UCS-2, Level 1}
+    0x00010109 {ISO/IEC 10646-1:1993; UTF-16, UCS Transformation Format 16-bit form}
+    0x05010001 {X/Open UTF-8; UCS Transformation Format 8 (UTF-8)}
+}
+
+proc GetCodeSetName {cs} {
+    global codesets
+    set id [format "0x%08x" $cs]
+    if {[info exists codesets($id)]} {
+	return $codesets($id)
+    }
+    return $id
+}
+
+proc DecodeCodeSetsTag {} {
+    puts "Codesets Tag"
+    puts "     Native char CS: [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+    set ncs_conv [Combat::CDR::Decoder::ulong]
+    for {set i 0} {$i < $ncs_conv} {incr i} {
+	if {$i == 0} {
+	    puts "   Accepted char CS: [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+	} else {
+	    puts "                     [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+	}
+    }
+    puts "    Native wchar CS: [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+    set ncs_conv [Combat::CDR::Decoder::ulong]
+    for {set i 0} {$i < $ncs_conv} {incr i} {
+	if {$i == 0} {
+	    puts "  Accepted wchar CS: [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+	} else {
+	    puts "                     [GetCodeSetName [Combat::CDR::Decoder::ulong]]"
+	}
+    }
+}
+
+proc DecodeAlternateIIOPAddressTag {} {
+    set host [Combat::CDR::Decoder::string]
+    set port [Combat::CDR::Decoder::ushort]
+    puts "Alternate IIOP Address Tag"
+    puts "       Addr:  $host:$port"
+}
+
+proc DecodeTaggedComponent {} {
+    set tag    [Combat::CDR::Decoder::ulong]
+
+    #
+    # encapsulated data with its own byteorder
+    #
+
+    set length [Combat::CDR::Decoder::ulong]
+    set pos    [Combat::CDR::Decoder::tell]
+    set obo    $Combat::CDR::Decoder::byteorder
+    set nbo    [Combat::CDR::Decoder::boolean]
+    set Combat::CDR::Decoder::byteorder $nbo
+
+    switch -- $tag {
+	0 { # TAG_ORB_TYPE
+	    DecodeORBTypeTag
+	}
+	1 { # TAG_CODE_SETS
+	    DecodeCodeSetsTag
+	}
+	3 { # TAG_ALTERNATE_IIOP_ADDRESS
+	    DecodeAlternateIIOPAddress
+	}
+	default {
+	    puts "Unknown Tagged Component, ComponentId = $tag"
+	    Combat::CDR::Decoder::seek $pos
+	    set data [Combat::CDR::Decoder::octets $length]
+	    DumpOctets "Data:" $data
+	}
+    }
+
+    #
+    # Restore correct byteorder and position
+    #
+
+    set Combat::CDR::Decoder::byteorder $obo
+    Combat::CDR::Decoder::seek [expr {$pos + $length}]
+}
+
+proc DecodeMultipleComponentsProfile {} {
+    puts "Multiple Components:"
+    set compcount [Combat::CDR::Decoder::ulong]
+    for {set cindex 0} {$cindex < $compcount} {incr cindex} {
+	DecodeTaggedComponent
+	puts ""
+    }
+}
+
+proc DecodeTaggedProfile {} {
+    set tag    [Combat::CDR::Decoder::ulong]
+
+    #
+    # encapsulated data with its own byteorder
+    #
+
+    set length [Combat::CDR::Decoder::ulong]
+    set pos    [Combat::CDR::Decoder::tell]
+    set obo    $Combat::CDR::Decoder::byteorder
+    set nbo    [Combat::CDR::Decoder::boolean]
+    set Combat::CDR::Decoder::byteorder $nbo
+
+    switch -- $tag {
+	0       { # TAG_INTERNET_IOP
+	    DecodeIIOPProfile
+	}
+	1       { # TAG_MULTIPLE_COMPONENTS
+	    DecodeMultipleComponentsProfile
+	}
+	default {
+	    puts "Unknown Profile, ProfileId = $tag"
+	    Combat::CDR::Decoder::seek $pos
+	    set data [Combat::CDR::Decoder::octets $length]
+	    DumpOctets "Data:" $data
+	}
+    }
+
+    #
+    # Restore correct byteorder and position
+    #
+
+    set Combat::CDR::Decoder::byteorder $obo
+    Combat::CDR::Decoder::seek [expr {$pos + $length}]
+}
+
+# ----------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------
+
+#
+# strip IOR: prefix and convert to binary
+#
+
+set ior [string range $ior 4 end]
+set data [binary format H* $ior]
+
+#
+# Init decoder with arbitrary byteorder, then set encapsulated bo
+#
+
+Combat::CDR::Decoder::constructor $data 0
+set nbo [Combat::CDR::Decoder::boolean]
+set Combat::CDR::Decoder::byteorder $nbo
+
+if {[catch {
+    set type_id [Combat::CDR::Decoder::string]
+ 
+    puts ""
+    if {$type_id != ""} {
+	puts "    Repo Id:  $type_id"
+    } else {
+	puts "    Repo Id:  <unknown>"
+    }
+    puts ""
+
+    set numofprofiles [Combat::CDR::Decoder::ulong]
+
+    for {set i 0} {$i < $numofprofiles} {incr i} {
+	DecodeTaggedProfile
+	puts ""
+    }
+} oops]} {
+    puts "error: could not decipher IOR string (corrupt?)"
+    puts "$errorInfo"
+}
+
+exit 0
+

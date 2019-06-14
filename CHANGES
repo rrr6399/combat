@@ -1,0 +1,224 @@
+ 0.7.3
+-------
+- Compilation fixes for Mico 2.3.11 or later
+
+
+ 0.7.2
+-------
+- use Ansi C++ headers to make Combat compile with gcc 3.2 or greater
+
+
+ 0.7.1
+-------
+- implement corba::dii to send invocations without the need for
+  type information in the Interface Repository
+- better error reporting
+
+
+ 0.7
+-----
+
+- support for valuetypes and value boxes
+- add corba::duplicate and corba::release as no-ops for compatibility
+  with the Tcl version of Combat
+- don't build icombatsh any longer; it required itclConfig.sh, which
+  new versions if [incr Tcl] don't provide any longer
+- fixes for ORBacus 4.1
+
+
+ 0.6.3
+-------
+
+- make idl2tcl pass -I and -D options to IDL compiler
+- free some memory when Tcl interpreter is deleted
+- fixes for MICO 2.3.6 and ORBacus 4.0.4
+
+
+ 0.6.2
+-------
+
+- fixes for ORBacus 4.0
+
+
+ 0.6.1
+-------
+
+- idl2tcl bug fix for nested types
+- Changes for ORBacus 4.0b3
+- Fix for throwing system exceptions
+- iordump bug fix
+
+
+ 0.6
+-----
+
+- Added pkgIndex.tcl file so that package require combat works.
+- Added -v (verbose) option to idl2tcl. Use more than once for even more
+  verbosity.
+- Fixed bug in servant locator wrapper.
+- Use precompiled idl2tcl'd files for tests and demos, so that they
+  can run even if idl2tcl is not supported in a configuration.
+- In a servant, out and inout parameters must now be accessed through
+  upvar. This should be cleaner than providing a limited number of shared
+  class-level variables.
+- Added --disable-combat-ir configuration option. This disables support
+  for the combat::ir command, further slimming down the binary, but
+  idl2tcl and combat::ir will stop working.
+- Added --disable-server-side configuration option. This removes all code
+  related to server-side scripting. The resulting program works fine for
+  client-side CORBA scripting and about 20% smaller.
+- Added new licensing information in LICENSE
+- Added pure-Tcl iordump command
+- Add corba::shutdown
+- Rename mico::ir to combat::ir
+- Rename to Combat, since TclMico isn't that appropriate any more
+- Generalized build of test cases and demos to work with different
+  ORBs than MICO.
+- Added corba::try command for Java-style exception handling
+- Added --impl flag to idl2tcl to generate an empty skeleton class, based
+  on suggestions and code by Carsten Zerbst
+- Add shortcuts for octet sequences, speeds up marshalling sequence<octet>
+  by factor 10.
+- Build stubbified if --enable-shared.
+- Added support for implementing dynamic servers by implementing
+  IDL:omg.org/PortableServer/DynamicImplementation:1.0 interface
+- Retired `corba::register', an ill-fated result of a discussion to live
+  without [incr Tcl] on the server side.
+- Updated configuration for generic ORB to be more usable.
+- Don't traverse the IFR for each invocation. Instead, download a
+  FullInterfaceDescription for each interface and cache it as long as
+  we keep references of that type.
+- Not only map sequence<octet> to a Tcl string, but also sequences of
+  chars plus arrays of char/octet.
+- Changed mapping for struct/union/exception/recursive mapping to reflect
+  the recommended C++ usage.
+- Added `random' demo.
+- Fix some identifiers in test cases.
+- Replaced a lot of MICO-specific code with CORBA 2.3-compliant code.
+- Removed mico::ir dump, describe and destroy subcommands. If necessary,
+  contact the IFR directly.
+- Reprogrammed idl2tcl entirely in Tcl, so that it works without mico::ir.
+- Changed server-side mapping to work without skeletons, but with a single
+  preloaded [incr Tcl] class.
+- Fixed handling of any types wrt contained object references. Ugly and
+  slow, but it seems to work. Future versions of Tcl will hopefully pro-
+  vide a better solution.
+- Make test cases use Object references passed via files.
+
+
+ 0.5d (1999/12/08)
+-------------------
+- Requires MICO 2.3.1
+- Changed memory management rules for TclMico::NewAnyObj and
+  TclMico::NewTypeCodeObj, which now do not consume their Any/TypeCode
+  argument, more in line with `in' argument passing.
+- Never update to a base type in TclMico::Object::UpdateType()
+- Fixed bug in TclMico::POA::id_to_servant() and id_to_reference()
+- Catch some more CORBA exceptions
+- Fixed some compilation problems with HP/UX aCC (groan)
+
+
+ 0.5c (1999/09/09)
+-------------------
+- Requires MICO 2.3.0
+- Changes for the new DynamicAny::DynAny in CORBA 2.3
+- Updated exception handling to Mico 2.2.7 (CORBA standard exceptions)
+
+
+ 0.5b (1999/07/08)
+-------------------
+- Requires MICO 2.2.7
+- Changes for Tcl 8.1
+- Add support for WChar/WString
+- Fixes for Mico 2.2.7
+- Don't convert handles to Any, as this causes all other instances
+  of the handle to disappear and become invalid
+- Use reference-counted servants
+
+
+ 0.5 (1999/03/15)
+------------------
+- Requires MICO 2.2.5
+- Code-patch for non-egcs compilers
+- Use --feed-included-defs in idl2tcl
+- Updates for Mico 2.2.5.
+- Changed mapping for sequences and arrays of octets from a Tcl string
+  to a list of characters.
+- Bugfix for out parameters in idl2tcl.
+- Use _get_interface if the obj's repository id is empty.
+- Handle recursive sequences.
+- Moved corba::ir back to the mico:: namespace.
+- Doc updates.
+- Rewrote test servers to use the POA.
+- removed ORB pseudo object
+- moved most of the existing commands to the corba:: namespace
+- added corba::features, corba::type, corba::const, corba::register
+- rewritten handling for `handles'; they can now be handled by
+  Tcl's reference counting mechanism
+- smart conversion from CORBA::Any to Tcl's list type
+- allow asynchronous binds
+- stole IR dependency computation from Mico to allow reopening
+  of modules
+- handle recursive sequences
+- Switch from mico-specific CORBA::Any extensions to DynAny
+- removal of some other minor mico-specific features
+- Fixes for various compilers.
+
+ 0.4 (1998/09/09)
+------------------
+- Requires MICO 2.2
+- doc updates
+- sligtly cleaned up Any type
+- minor bugfixes
+- added idl2tcl compiler
+- Added ORB pseudo object, ORB_init and ORB_instance methods
+- Added support for Adapter Activator
+- emit forward references in IR description
+- changed many assert's to proper error checking in any.cc
+- changed struct mapping to include field names for assignment
+  to `array set' or from `array get'.
+- Always build tclmicosh (and itclmicosh)
+- The server-side mapping is now using [incr Tcl] objects. idl2tcl
+  generates skeleton classes that you can derive implementations
+  from.
+- (Nearly) complete mapping of the POA, POAManager, POACurrent and
+  ServerRequest pseudo objects.
+- TypeCode is now a Tcl native object.
+- Recognize the new CORBA types (unsigned) long long, long double,
+  wchar, wchar_t. The latter cannot yet be represented as Tcl
+  strings.
+
+ 0.3 (1998/07/16)
+------------------
+- Requires MICO 2.0.6 - 2.1.0
+- Replaced STL maps with a STL-lookalike implementation based on
+  fast Tcl hash table.
+- Doc updates.
+- Any is now a Tcl native type, so conversion from and to strings is
+  only done when necessary.
+- Changed TypeCode mapping. Names of struct or union elements are not
+  needed.
+- Added Any marshalling test suite.
+- Improved support for asynchronous operations. Added support for a
+  callback proc.
+- Added Async test suite.
+- Moved the Request class to its own file.
+- Accessing base classes' operations and attributes now works.
+- Changed Objref mapping to stringified IORs, to solve lifetime
+  problems when objrefs in an any are converted back and forth.
+- Added mico::bind -ref option to bind to an IOR.
+- Added mico::ir type and equal options to access TypeCode values
+  in an IR.
+- Added LaTeX/PostScript doc.
+
+ 0.2 (1998/07/05)
+------------------
+- Requires MICO 2.0.6 - 2.0.8
+- Put under CVS control
+- Added test suite
+- Many bug fixes
+
+ 0.1
+------------------
+- Requires  MICO 2.0.3 - 2.0.6
+- Initial release

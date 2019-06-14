@@ -1,0 +1,27 @@
+#!/bin/sh
+
+PATH=../..:$PATH
+LD_LIBRARY_PATH=../..:$LD_LIBRARY_PATH
+SHLIB_PATH=../..:$SHLIB_PATH
+LIBPATH=../..:$LIBPATH
+export PATH LD_LIBRARY_PATH SHLIB_PATH LIBPATH
+
+rm -f server.ior
+
+if test -f ../../icombatsh ; then
+    echo "Starting Tcl server"
+    ./server.tcl &
+    server_pid=$!
+else
+    echo "Combat compiled without [incr Tcl], starting C++ server"
+    ./server &
+    server_pid=$!
+fi
+
+for i in 0 1 2 3 4 5 6 7 8 9 ; do if test -r server.ior ; then break ; else sleep 1 ; fi ; done
+
+echo "Running Tcl client"
+./client.tcl
+
+kill $server_pid 2> /dev/null
+exit 0

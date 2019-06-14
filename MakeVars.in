@@ -1,0 +1,21 @@
+#
+# ----------------------------------------------------------------------
+# Makefile Definitions for Combat's tests and demos.
+# ----------------------------------------------------------------------
+#
+
+@SET_MAKE@
+SHELL     = /bin/sh
+CC        = @CC@
+CXX       = @CXX@
+CFLAGS    = @CFLAGS@
+CXXFLAGS  = @CXXFLAGS@
+CPPFLAGS  = @DEFS@ -I. @CPPFLAGS@
+
+LD        = @CXX@
+LDFLAGS   = @LDFLAGS@
+LIBS      = @LIBS@
+
+ORB       = @ORB@
+IDL       = @IDL@
+

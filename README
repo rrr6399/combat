@@ -1,0 +1,140 @@
+
+----------------------------------------------------------------------
+Combat -- A Tcl language mapping for CORBA
+----------------------------------------------------------------------
+
+This package provides a Tcl language mapping for CORBA. It plugs into
+the DII (Dynamic Invocation Interface) and DSI (Dynamic Skeleton
+Interface) to allow easy client- and server-side CORBA scripting with
+Tcl.
+
+On the client side, Combat is not only useful to easily test-drive
+your CORBA servers, but rather makes Tcl an exciting language for
+distributed programming. Also, with Tk, you can quickly develop
+attractive user interfaces accessing CORBA services. Server-side
+scripting using [incr Tcl] classes also offers a wide range of
+possibilities.
+
+Combat requires a CORBA 2.3 compliant ORB with a C++ mapping. For more
+compatibility information, see "ORB Notes" below.
+
+
+Features
+--------
+
+- Client side Tcl scripting
+- Server side Tcl scripting with full POA support
+- Straightforward IDL to Tcl mapping
+- Asynchronous invocations
+
+
+Prerequisites
+-------------
+
+This version of Combat requires a CORBA 2.3-compliant ORB with a C++
+mapping. See "ORB Notes" below for supported configurations.
+
+For client-side scripting, Combat requires Tcl 8.0. For server-side
+scripting, Tcl 8.0.3 and [incr Tcl] 3.0 is needed. This version of
+Combat has been tested against Tcl 8.0.3, 8.2.2 and 8.3.0.
+
+
+What it looks like
+------------------
+
+A popular example is the "Account" example, in which a Bank supports
+the "create" operation to open a new account. An account, in turn, is
+an object that supports the "deposit", "withdraw" and "balance"
+operations. Assuming that you have the Bank's object reference in the
+file "Bank.ior" in the current directory, a sample session could look
+like
+
+% set Bank [corba::string_to_object file://[pwd]/Bank.ior]
+% set Account [$Bank create]
+% $Account deposit 700
+% $Account withdraw 450
+% puts "Current balance is $Account balance]."
+Current balance is 250.
+
+
+Installation
+------------
+
+A simple "./configure" followed by "make" is sufficient for building
+the package statically. For more advanced configuration options and
+caveats, see the separate file "INSTALL".
+
+The Win32 port is not yet integrated and requires hacking a Makefile.
+However, a Win95 loadable module (based on Mingw32 and MICO) is available
+on the Combat home page.
+
+
+Documentation
+-------------
+
+Combat comes with an extensive manual in Postscript format in the
+doc/ subdirectory, a number of test cases in the test/ subdirectory,
+and a few demos in the demo/ subdirectory.
+
+If you've already used a previous version of Combat, see the file
+"PORTING" to learn about the changes from previous versions.
+
+
+Download
+--------
+
+You can download Combat from
+  http://www.fpx.de/Combat/
+
+
+Combat is Open Source and distributed under the terms of the GNU Library
+General Public License (LGPL). For more information, see the file "LICENSE".
+
+
+ORB Notes
+---------
+
+Combat is designed to use only CORBA 2.3-compliant mechanisms, i.e. it
+should work with any CORBA 2.3-compliant ORB with a C++ mapping. However,
+it has a track record of unearthing ORB bugs and problems. Currently,
+Combat has been tested with MICO 2.3.9. Some notes on other ORBs:
+
+MICO 2.3.5 - 2.3.9
+  - No known limitations, all tests succeed.
+
+
+ORBacus 4.0.1 - 4.1.0
+  - Works fine.
+  - Since ORBacus 4.1 is always multithreaded, you should build Combat
+    against a thread-enabled build of Tcl.
+  - There seems to be a problem using optimization (-O) when compiling
+    ORBacus or ORBacus-based programs. If you happen to run into this,
+    re-configure with --disable-optimize.
+  - In some cases, ./configure might not find all libraries that ORBacus
+    depends on. This may result in link errors when compiling the tests
+    and demos. Edit MakeVars to correct the LIBS variable.
+  - test/9 currently fails, but this is neither a bug in Combat nor in
+    ORBacus. The test script wants to start up nsd (Mico's Naming Service)
+    rather than nameserv (ORBacus's Naming Service). You'd also need to
+    use ORBacus' CosNaming.idl.
+  - ORBacus does not provide an "internal" Interface Repository to use.
+    If none is available (using resolve_initial_references) and you try
+    to feed a local Interface Repository using combat::ir, Combat will
+    start and connect to a private irserv process. This can be prevented
+    at configuration time using --disable-local-repo.
+
+
+TAO 1.2
+  - Not tested yet, but features that were missing in TAO 1.0 and 1.1
+    that were prohibiting a port of Combat are now present
+  - You may try your luck using the Generic ORB configuration
+
+
+So at the moment, MICO and ORBacus are the only supported platforms for
+Combat. Ports to other ORBs are possible. Email the author if you are
+interested in support for these or other platforms.
+
+
+----------------------------------------------------------------------
+Send comments, complaints and bug reports to            Frank Pilhofer
+                                                             fp@fpx.de

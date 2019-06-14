@@ -1,0 +1,162 @@
+#
+# ----------------------------------------------------------------------
+# Combat Makefile
+# ----------------------------------------------------------------------
+#
+
+#
+# Tools and directories setup
+#
+
+@SET_MAKE@
+SHELL     = /bin/sh
+CC        = @CC@
+CXX       = @CXX@
+CFLAGS    = @CFLAGS@ @BUILD_CFLAGS@
+CXXFLAGS  = @CXXFLAGS@ @BUILD_CFLAGS@
+CPPFLAGS  = @DEFS@ @CPPFLAGS@ @BUILD_CPPFLAGS@
+
+LD        = @CXX@
+LDFLAGS   = @LDFLAGS@ @TCL_LDFLAGS@
+LIBS      = @LIBS@ @TCL_LIBS@
+RANLIB    = @RANLIB@
+MAKE_REPO = @MAKE_REPO@
+
+LDSO      = @LDSO@
+SOEXT     = @SOEXT@
+LDSOOPTS  = @LDSOOPTS@ $(LDFLAGS)
+LDSOLIBS  = @LDSOLIBS@
+
+srcdir        = @srcdir@
+prefix        = @prefix@
+exec_prefix   = @exec_prefix@
+bindir        = @bindir@
+libdir        = @libdir@
+
+INSTALL       = @srcdir@/install-sh
+INSTALL_PROG  = $(INSTALL) -c
+INSTALL_DATA  = $(INSTALL) -c -m 644
+
+#
+# Build setup
+#
+
+ORB       = @ORB@
+IDL       = @IDL@
+TARGET    = @TARGET@ idl2tcl
+WHATSHELL = @WHATSHELL@
+WHATLIB   = @LIBRARY@
+SOURCES   = combat.cc any.cc typecode.cc request.cc pseudo.cc \
+            @FEATURE_SOURCES@ @ORB_SOURCES@
+OBJS      = $(SOURCES:.cc=.o)
+
+IPROGS    = @WHATSHELL@ idl2tcl iordump
+ILIBS     = @LIBRARY@ pkgIndex.tcl
+
+#
+# ----------------------------------------------------------------------
+# End of autoconf stuff
+# ----------------------------------------------------------------------
+#
+
+.SUFFIXES :
+.SUFFIXES : .cc .c .h .o .so .sl .idl
+
+.idl.cc:
+	$(IDL) $<
+
+.cc.o:
+	$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $<
+
+.c.o:
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $<
+
+#
+# tea targets
+#
+
+all:		binaries libraries doc
+libraries:
+doc:
+
+binaries:	$(TARGET)
+	-chmod +x idl2tcl
+	-chmod +x iordump
+
+test:		all
+	(cd test ; $(MAKE) test)
+
+install: all install-binaries install-libraries install-doc
+
+install-binaries:
+	-mkdir $(prefix)
+	-mkdir $(exec_prefix)
+	-mkdir $(bindir)
+	-mkdir $(libdir)
+	for file in $(IPROGS) ; do \
+		$(INSTALL_PROG) $(srcdir)/$$file $(bindir) ; \
+        done
+	for file in $(ILIBS) ; do \
+		$(INSTALL_PROG) $(srcdir)/$$file $(libdir) ; \
+	done
+
+install-libraries:
+install-doc:
+
+clean:
+	(cd demo ; $(MAKE) clean)
+	(cd test ; $(MAKE) clean)
+	(cd doc ; $(MAKE) clean)
+	rm -rf combatsh icombatsh *.so *.sl *.a
+	rm -rf core a.out *~ *.o *.I
+
+distclean:	clean
+	rm -f config.status config.cache config.log
+	rm -f Makefile MakeVars idl2tcl lib.exp
+
+#
+# real targets
+#
+
+libcombat@SOEXT@:	$(OBJS)
+	-$(MAKE_REPO) || true
+	rm -f $@
+	$(LDSO) -o $@ $(LDSOOPTS) $(OBJS) $(LDSOLIBS)
+
+libcombat.a:	$(OBJS)
+	-$(MAKE_REPO) || true
+	rm -f $@
+	ar r $@ $(OBJS)
+	-$(RANLIB) $@
+
+#
+# For Mingw32 (requires hacking the Makefile)
+#
+
+DLLWRAP_FLAGS = --target=i386-mingw32 -mno-cygwin --driver-name c++
+
+combat.dll:	$(OBJS) combat.def
+	dllwrap $(DLLWRAP_FLAGS) --def combat.def -o $@ $(OBJS) \
+		$(LDSOOPTS) $(LDSOLIBS)
+
+combat.def:	$(OBJS)
+	dlltool --output-def $@ $(OBJS)
+
+combatsh:	$(WHATLIB) tclAppInit.o
+	$(LD) -o $@ tclAppInit.o -L. -lcombat $(LDFLAGS) $(LIBS)
+
+idl2tcl:
+	-chmod +x idl2tcl
+
+combat.o:	combat.cc combat.h tclmap.h
+any.o:		any.cc combat.h
+ir.o:		ir.cc combat.h
+typecode.o:	typecode.cc combat.h
+request.o:	request.cc combat.h
+pseudo.o:	pseudo.cc combat.h
+skel.o:		skel.cc combat.h
+tclAppInit.o:	tclAppInit.c
+itclAppInit.o:	itclAppInit.c
+event-corba.o:	event-corba.cc combat.h
+event-mico.o:	event-mico.cc combat.h
+mico-binder.o:  mico-binder.cc mico-binder.h
